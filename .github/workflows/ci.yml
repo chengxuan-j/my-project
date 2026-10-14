@@ -8,6 +8,9 @@ on:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -24,10 +27,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Check web_next/package.json exists
+      - name: Check frontend/package.json exists
         id: check
         run: |
-          if [ -f web_next/package.json ]; then
+          if [ -f frontend/package.json ]; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
@@ -38,9 +41,9 @@ jobs:
           node-version: "20"
       - name: Install
         if: steps.check.outputs.exists == 'true'
-        working-directory: web_next
+        working-directory: frontend
         run: npm ci
       - name: Build
         if: steps.check.outputs.exists == 'true'
-        working-directory: web_next
+        working-directory: frontend
         run: npm run build

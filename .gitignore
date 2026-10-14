@@ -1,9 +1,9 @@
 .env
 __pycache__/
 *.pyc
-storage/*.db
-storage/*.db-wal
-storage/*.db-shm
+backend/storage/*.db
+backend/storage/*.db-wal
+backend/storage/*.db-shm
 .pytest_cache/
 
 # 运行日志与产物
@@ -23,9 +23,9 @@ node_modules/
 # 机器狗 / 小智服务（合并自 xiaozhi-esp32-server）
 # 注意：.gitignore 不支持行尾注释，注释必须单独成行。
 # 否则整行（含 "# 注释"）会被当成一个模式，忽略规则静默失效——
-# 这正是 xiaozhi-server/data/.config.yaml（含 API Key）被提交上去的原因。
-xiaozhi-server/data/
-xiaozhi-server/tmp/
-xiaozhi-server/models/
-vision-control/models/
-web-control/models/
+# 这正是 robot/xiaozhi-server/data/.config.yaml（含 API Key）曾被盗提交的原因。
+robot/xiaozhi-server/data/
+robot/xiaozhi-server/tmp/
+robot/xiaozhi-server/models/
+robot/vision-control/models/
+robot/web-control/models/

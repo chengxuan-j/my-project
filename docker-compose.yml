@@ -14,7 +14,7 @@ services:
     restart: unless-stopped
 
   api:
-    build: .
+    build: ./backend
     depends_on:
       db:
         condition: service_healthy
@@ -53,13 +53,13 @@ services:
       - "8003:8003"
     volumes:
       # 活配置（data/.config.yaml，含 OTA 地址 / LLM / 机器狗 IP）
-      - ./xiaozhi-server/data:/opt/xiaozhi-esp32-server/data
+      - ./robot/xiaozhi-server/data:/opt/xiaozhi-esp32-server/data
     # 注意：镜像自带完整语音链路；当前配置未启用本地 ASR，
     # 无需挂载 SenseVoiceSmall 模型（897M，合并时已排除）
 
   web:
     build:
-      context: ./web_next
+      context: ./frontend
       args:
         # 容器网络内后端服务名；Next 在构建期把它作为 /api 代理目标
         BACKEND_URL: http://api:8000

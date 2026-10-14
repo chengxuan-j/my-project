@@ -3,6 +3,10 @@
 > 探索时间：2026-09-23
 > 设备：ESP-Hi（乐鑫 ESP Friends 开源机器狗）
 > 目标：把机器狗的控制权从厂商云端迁到自己手里
+>
+> ⚠️ **路径提示（2026-10-14）**：本文提到的 `xiaozhi-server/` 现位于 `robot/xiaozhi-server/`；
+> 项目根目录也已从 `E:\elderly_companion` 迁至 `C:\Users\BigGayGod\Desktop\my-project-main`。
+> 正文未作改动，以保留其作为当时探索过程的记录价值。
 
 ---
 

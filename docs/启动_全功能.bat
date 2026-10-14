@@ -8,8 +8,8 @@ REM ============================================================
 
 REM ROOT = project root (this script lives in docs/, so go one level up)
 set "ROOT=%~dp0.."
-set "SERVER=%ROOT%xiaozhi-server"
-set "WEB=%ROOT%web-control"
+set "SERVER=%ROOT%robot\xiaozhi-server"
+set "WEB=%ROOT%robot\web-control"
 set "DOG_IP=10.1.56.231"
 
 REM ============================================================
@@ -121,10 +121,10 @@ echo     A. Set XIAOZHI_PYTHON to your interpreter path:
 echo          setx XIAOZHI_PYTHON "D:\miniconda3\envs\xiaozhi\python.exe"
 echo     B. Create a project venv and install dependencies:
 echo          python -m venv .venv
-echo          .venv\Scripts\pip install -r xiaozhi-server\requirements.txt
+echo          .venv\Scripts\pip install -r robot\xiaozhi-server\requirements.txt
 echo     C. Create a conda env named xiaozhi:
 echo          conda create -n xiaozhi python=3.10
-echo          conda run -n xiaozhi pip install -r xiaozhi-server\requirements.txt
+echo          conda run -n xiaozhi pip install -r robot\xiaozhi-server\requirements.txt
 echo.
 pause
 exit /b 1

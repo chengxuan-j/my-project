@@ -1,6 +1,6 @@
 # 老人情感陪伴 AI Demo（含 ESP-Hi 机器狗控制）
 
-> 2026-10-13：机器狗相关代码已从 `xiaozhi-esp32-server` 合并入库（`xiaozhi-server/` + `vision-control/` + `web-control/`），详见文末「机器狗子系统」。
+> 2026-10-13：机器狗相关代码已从 `xiaozhi-esp32-server` 合并入库（现位于 `robot/` 下：`xiaozhi-server/` + `vision-control/` + `web-control/`），详见文末「机器狗子系统」。
 > 2026-10-13：新增「每日陪伴日报」——每天定时把老人聊天汇总（统计 + AI 摘要）推送家属看板，详见文末同名章节。
 
 第一阶段 Qwen API 版本。**本地不下载任何大模型、不训练、不微调、不需要 GPU**，所有模型能力通过通义千问（DashScope OpenAI 兼容端点）远程 API 获得。
@@ -44,7 +44,7 @@
 ## 安装
 
 ```bash
-cd elderly_companion
+cd backend
 pip install -r requirements.txt
 ```
 
@@ -91,6 +91,7 @@ EMAIL_CODE_MAX_ATTEMPTS=5
 ## 运行
 
 ```bash
+cd backend
 python run.py
 ```
 
@@ -184,14 +185,14 @@ python run.py
 家属创建的 `global` 文档只会共享给该家属绑定的老人，不会影响其他家庭；只有系统直接导入、
 `created_by` 为空的公共资料才会对所有老人可见。
 
-项目内置的基础资料位于 `data/knowledge_base.json`。首次部署后执行：
+项目内置的基础资料位于 `backend/data/knowledge_base.json`。首次部署后执行：
 
 ```bash
-python scripts/seed_knowledge.py
+cd backend && python scripts/seed_knowledge.py
 ```
 
 脚本可重复运行，相同内容不会重复写入，并会自动为缺少向量的分块补建 Embedding。
-没有可用的 Embedding 服务时，可使用 `python scripts/seed_knowledge.py --no-embed` 离线导入，
+没有可用的 Embedding 服务时，可使用 `cd backend && python scripts/seed_knowledge.py --no-embed` 离线导入，
 系统会自动使用关键词检索兜底。
 
 ## 部署上线（老人端 / 家属端 多客户端）
@@ -200,7 +201,7 @@ python scripts/seed_knowledge.py
 访问同一个前端地址、各自登录即可实时双向互动（情绪看板、留言/牵挂等）。
 
 ### 方式一：局域网 / 单机多人测试
-1. 启动后端（`python run.py`，:8000）与前端（`cd web_next && npm run start`，:3000）；
+1. 启动后端（`cd backend && python run.py`，:8000）与前端（`cd frontend && npm run start`，:3000）；
 2. 让另一台设备（手机/平板）连同一 WiFi，访问 `http://<本机IP>:3000`
    （Windows 查 IP：`ipconfig`；必要时放行防火墙 3000 端口）；
 3. 设备 A 登录老人账号、设备 B 登录家属账号，即可同时在线互动。
@@ -211,7 +212,7 @@ cp .env.example .env          # 至少填 QWEN_API_KEY；生产务必改 JWT_SEC
 docker compose up -d --build  # db(PostgreSQL) + api(:8000) + web(:3000)
 ```
 - 前端容器通过 `BACKEND_URL=http://api:8000` 代理 `/api/v1` 到后端；
-- 该地址在**构建期**由 `web_next/Dockerfile` 的构建参数注入（Next rewrites 在构建期固化）。
+- 该地址在**构建期**由 `frontend/Dockerfile` 的构建参数注入（Next rewrites 在构建期固化）。
 
 ### 生产建议
 - 用 **Nginx 同域反向代理**：`/` → `web:3000`、`/api/` → `api:8000`，前后端同源可省去 CORS；
@@ -238,38 +239,44 @@ python -m pytest tests -v -s       # 全部（无 Key 或账户欠费时真实 A
 ## 项目结构
 
 ```
-elderly_companion/
-├── app/                        # 老人陪伴 FastAPI 后端（:8000）
-│   ├── main.py / config.py     # 入口 + .env 配置（含小智视觉/机器狗地址）
-│   ├── api/v1/                 # auth/chat/dog/emotion/vision/speech/family/knowledge...
-│   ├── services/dog_control.py # 机器狗动作控制（HTTP → ESP-Hi 固件 /control）
-│   ├── agent/ memory/ emotion/ companion/ rag/ scheduler/ scene/ content/
-│   └── speech/                 # TTS+ASR（DashScope 远程，零本地模型）
-├── web_next/                   # Next.js 前端（:3000），/api/v1 代理到后端
-├── xiaozhi-server/             # 小智 ESP32 服务（2026-10 合并自 xiaozhi-esp32-server）
-│   ├── app.py                  # WS :8001（设备语音通道）+ HTTP :8003（OTA/视觉）
-│   ├── config.yaml             # 基础配置；data/.config.yaml 为运行期覆盖配置（勿入库）
-│   ├── plugins_func/functions/robot_action.py  # LLM 控狗工具（与 dog_control.py 协议一致）
-│   └── models/snakers4_silero-vad/   # SenseVoiceSmall(897M) 已排除：当前未启用本地 ASR
-├── vision-control/             # PC 摄像头手势/姿势识别 → /control（MediaPipe/YOLO）
-├── web-control/                # 机器狗网页调试台（:8080，不接真机时调试用）
+my-project-main/
+├── backend/                    # 老人陪伴 FastAPI 后端（:8000）
+│   ├── app/
+│   │   ├── main.py / config.py # 入口 + .env 配置（含小智视觉/机器狗地址）
+│   │   ├── api/v1/             # auth/chat/dog/emotion/vision/speech/family/knowledge...
+│   │   ├── services/dog_control.py # 机器狗动作控制（HTTP → ESP-Hi 固件 /control）
+│   │   ├── agent/ memory/ emotion/ companion/ rag/ scheduler/ scene/ content/
+│   │   └── speech/             # TTS+ASR（DashScope 远程，零本地模型）
+│   ├── data/                   # 知识库 / 音乐 / 故事 JSON
+│   ├── scripts/                # 数据迁移 + dog relay 手跑测试
+│   ├── tests/                  # pytest
+│   ├── run.py                  # 启动入口：python run.py
+│   └── storage/                # SQLite（运行时自动创建）
+├── frontend/                   # Next.js 前端（:3000），/api/v1 代理到后端
+├── robot/                      # 机器狗子系统
+│   ├── xiaozhi-server/         # 小智 ESP32 服务（2026-10 合并自 xiaozhi-esp32-server）
+│   │   ├── app.py              # WS :8001（设备语音通道）+ HTTP :8003（OTA/视觉）
+│   │   ├── config.yaml         # 基础配置；data/.config.yaml 为运行期覆盖配置（勿入库）
+│   │   ├── plugins_func/functions/robot_action.py  # LLM 控狗工具（与 dog_control.py 协议一致）
+│   │   └── models/snakers4_silero-vad/   # SenseVoiceSmall(897M) 已排除：当前未启用本地 ASR
+│   ├── vision-control/         # PC 摄像头手势/姿势识别 → /control（MediaPipe/YOLO）
+│   └── web-control/            # 机器狗网页调试台（:8080，不接真机时调试用）
 ├── docs/                       # 机器狗整合规划 / 启动指南 / ESP-Hi 探索记录 + 启动_全功能.bat
-├── storage/companion.db        # SQLite（运行时自动创建）
 ├── docker-compose.yml          # db + api + web + xiaozhi 四服务编排
-└── run.py
+└── Makefile                    # dev / test / lint / migrate / docker
 ```
 
 ### 机器狗子系统（合并内容，2026-10-13）
 
-原 `xiaozhi-esp32-server` 项目的机器狗相关代码已合入本仓库，未合并的部分（小智官方 manager 管理后台 / digital-human 数字人）仍在 `E:\company\xiaozhi-esp32-server`：
+原 `xiaozhi-esp32-server` 项目的机器狗相关代码已合入本仓库的 `robot/` 目录下：
 
 | 目录 | 职责 | 启动方式 |
 |---|---|---|
-| `xiaozhi-server/` | ESP32 设备的语音通道（WS 8001）+ OTA/视觉接口（8003） | `docs\启动_全功能.bat` 或 `python app.py`（需含 funasr 的 Python 环境） |
-| `web-control/` | 网页调试台，连 WS 发指令、快捷动作按钮 | `python server.py`（8080） |
-| `vision-control/` | 电脑摄像头手势识别 → HTTP `/control` 驱狗 | `python vision_dog.py --http http://10.1.56.231` |
+| `robot/xiaozhi-server/` | ESP32 设备的语音通道（WS 8001）+ OTA/视觉接口（8003） | `docs\启动_全功能.bat` 或在该目录下 `python app.py`（需含 funasr 的 Python 环境） |
+| `robot/web-control/` | 网页调试台，连 WS 发指令、快捷动作按钮 | 在该目录下 `python server.py`（8080） |
+| `robot/vision-control/` | 电脑摄像头手势识别 → HTTP `/control` 驱狗 | 在该目录下 `python vision_dog.py --http http://10.1.56.231` |
 
-老人陪伴后端与小智服务的协作：`app/api/v1/vision.py` 把老人端照片转发到小智的 MCP Vision 接口（`XIAOZHI_VISION_URL`）做图像理解；`app/services/dog_control.py` 直接驱动机器狗固件。详细整合背景见 `docs/机器狗整合规划.md`。
+老人陪伴后端与小智服务的协作：`backend/app/api/v1/vision.py` 把老人端照片转发到小智的 MCP Vision 接口（`XIAOZHI_VISION_URL`）做图像理解；`backend/app/services/dog_control.py` 直接驱动机器狗固件。详细整合背景见 `docs/机器狗整合规划.md`。
 
 ## 每日陪伴日报（家属推送）
 
@@ -280,7 +287,7 @@ elderly_companion/
 - **同日去重**：同一老人同一天只推一次；当天没聊天/未绑定家属则不推
 - **实时触达**：生成时经 SSE 通知在线家属，未读显示「新」角标
 
-涉及文件：`app/services/digest_service.py`（统计+摘要）、`app/scheduler/jobs/daily_digest.py`（定时任务）、`app/scheduler/scheduler_manager.py`（注册）、`web_next/src/app/family/page.tsx`（日报卡片）。
+涉及文件：`backend/app/services/digest_service.py`（统计+摘要）、`backend/app/scheduler/jobs/daily_digest.py`（定时任务）、`backend/app/scheduler/scheduler_manager.py`（注册）、`frontend/src/app/family/page.tsx`（日报卡片）。
 
 > 注意：调度器在生产环境自动运行；开发环境需在 `.env` 设 `SCHEDULER_ENABLED=true` 才会启动（默认关闭，避免本地跑出一堆定时副作用）。
 

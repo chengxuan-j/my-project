@@ -1,21 +1,21 @@
 .PHONY: dev test lint format migrate docker clean
 
 dev:
-	uvicorn app.main:app --reload
+	cd backend && uvicorn app.main:app --reload
 
 test:
-	pytest tests/ -q
+	cd backend && pytest tests/ -q
 
 lint:
-	ruff check app/
+	ruff check backend/app/
 
 format:
-	ruff format app/
+	ruff format backend/app/
 
 # 应用启动时（lifespan）会按 ORM 定义自动建表。
 # 如需把本地 SQLite 数据迁移到 PostgreSQL，使用下面的脚本：
 migrate:
-	python scripts/migrate_sqlite_to_pg.py
+	cd backend && python scripts/migrate_sqlite_to_pg.py
 
 docker:
 	docker compose up --build
