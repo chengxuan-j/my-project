@@ -1,6 +1,6 @@
 # 老人情感陪伴 AI Demo（含 ESP-Hi 机器狗控制）
 
-> 2026-10-13：机器狗相关代码已从 `xiaozhi-esp32-server` 合并入库（现位于 `robot/` 下：`xiaozhi-server/` + `vision-control/` + `web-control/`），详见文末「机器狗子系统」。
+> 2026-10-13：机器狗相关代码已从 `xiaozhi-esp32-server` 合并入库（现位于 `robot/xiaozhi-server/`），详见文末「机器狗子系统」。
 > 2026-10-13：新增「每日陪伴日报」——每天定时把老人聊天汇总（统计 + AI 摘要）推送家属看板，详见文末同名章节。
 
 第一阶段 Qwen API 版本。**本地不下载任何大模型、不训练、不微调、不需要 GPU**，所有模型能力通过通义千问（DashScope OpenAI 兼容端点）远程 API 获得。
@@ -206,16 +206,10 @@ cd backend && python scripts/seed_knowledge.py
    （Windows 查 IP：`ipconfig`；必要时放行防火墙 3000 端口）；
 3. 设备 A 登录老人账号、设备 B 登录家属账号，即可同时在线互动。
 
-### 方式二：Docker 一键上线
-```bash
-cp .env.example .env          # 至少填 QWEN_API_KEY；生产务必改 JWT_SECRET_KEY
-docker compose up -d --build  # db(PostgreSQL) + api(:8000) + web(:3000)
-```
-- 前端容器通过 `BACKEND_URL=http://api:8000` 代理 `/api/v1` 到后端；
-- 该地址在**构建期**由 `frontend/Dockerfile` 的构建参数注入（Next rewrites 在构建期固化）。
+> 本仓库曾内置一套 docker-compose 部署编排（PostgreSQL + api + web + xiaozhi 容器），已于 2026-10-14 移除——当前项目只走上面的本地直接运行方式。将来若要容器化，注意 `xiaozhi` 服务**必须构建本地 `robot/xiaozhi-server/` 源码**，不能用官方镜像（官方镜像不含"让狗说话"的改动）。
 
 ### 生产建议
-- 用 **Nginx 同域反向代理**：`/` → `web:3000`、`/api/` → `api:8000`，前后端同源可省去 CORS；
+- 用 **Nginx 反向代理**：`/` → 前端 :3000、`/api/` → 后端 :8000，前后端同源可省去 CORS；
 - 配置 HTTPS（如 Let's Encrypt）；
 - 替换强 `JWT_SECRET_KEY`；数据库改用 PostgreSQL（`DATABASE_URL`）；
 - 跨域部署时用 `CORS_ORIGINS` 填前端正式域名（逗号分隔多个）。
@@ -254,16 +248,14 @@ my-project-main/
 │   └── storage/                # SQLite（运行时自动创建）
 ├── frontend/                   # Next.js 前端（:3000），/api/v1 代理到后端
 ├── robot/                      # 机器狗子系统
-│   ├── xiaozhi-server/         # 小智 ESP32 服务（2026-10 合并自 xiaozhi-esp32-server）
-│   │   ├── app.py              # WS :8001（设备语音通道）+ HTTP :8003（OTA/视觉）
-│   │   ├── config.yaml         # 基础配置；data/.config.yaml 为运行期覆盖配置（勿入库）
-│   │   ├── plugins_func/functions/robot_action.py  # LLM 控狗工具（与 dog_control.py 协议一致）
-│   │   └── models/snakers4_silero-vad/   # SenseVoiceSmall(897M) 已排除：当前未启用本地 ASR
-│   ├── vision-control/         # PC 摄像头手势/姿势识别 → /control（MediaPipe/YOLO）
-│   └── web-control/            # 机器狗网页调试台（:8080，不接真机时调试用）
+│   └── xiaozhi-server/         # 小智 ESP32 服务（2026-10 合并自 xiaozhi-esp32-server）
+│       ├── app.py              # WS :8001（设备语音通道）+ HTTP :8003（OTA/视觉）
+│       ├── start.bat           # 双击启动（自动探测 Python + ffmpeg/opus）
+│       ├── config.yaml         # 基础配置；data/.config.yaml 为运行期覆盖配置（勿入库）
+│       ├── plugins_func/functions/robot_action.py  # LLM 控狗工具（与 dog_control.py 协议一致）
+│       └── models/snakers4_silero-vad/   # SenseVoiceSmall(897M) 已排除：当前未启用本地 ASR
 ├── docs/                       # 机器狗整合规划 / 启动指南 / ESP-Hi 探索记录 + 启动_全功能.bat
-├── docker-compose.yml          # db + api + web + xiaozhi 四服务编排
-└── Makefile                    # dev / test / lint / migrate / docker
+└── Makefile                    # dev / test / lint / migrate
 ```
 
 ### 机器狗子系统（合并内容，2026-10-13）
@@ -272,9 +264,9 @@ my-project-main/
 
 | 目录 | 职责 | 启动方式 |
 |---|---|---|
-| `robot/xiaozhi-server/` | ESP32 设备的语音通道（WS 8001）+ OTA/视觉接口（8003） | `docs\启动_全功能.bat` 或在该目录下 `python app.py`（需含 funasr 的 Python 环境） |
-| `robot/web-control/` | 网页调试台，连 WS 发指令、快捷动作按钮 | 在该目录下 `python server.py`（8080） |
-| `robot/vision-control/` | 电脑摄像头手势识别 → HTTP `/control` 驱狗 | 在该目录下 `python vision_dog.py --http http://10.1.56.231` |
+| `robot/xiaozhi-server/` | ESP32 设备的语音通道（WS 8001）+ OTA/视觉接口（8003） | 双击 `robot\xiaozhi-server\start.bat`，或在该目录下 `python app.py`（需装有 opuslib_next 的 Python 环境） |
+
+> 早期还合并过 `vision-control/`（PC 摄像头手势识别）与 `web-control/`（网页调试台）两个目录，二者的能力已被 `frontend/` 的浏览器端视觉引擎（`src/lib/visionEngine.ts`，由 vision-control 移植而来）+ 后端 dog API 取代，已于 2026-10-14 删除。
 
 老人陪伴后端与小智服务的协作：`backend/app/api/v1/vision.py` 把老人端照片转发到小智的 MCP Vision 接口（`XIAOZHI_VISION_URL`）做图像理解；`backend/app/services/dog_control.py` 直接驱动机器狗固件。详细整合背景见 `docs/机器狗整合规划.md`。
 

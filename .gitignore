@@ -1,6 +1,8 @@
 .env
 __pycache__/
 *.pyc
+.venv/
+venv/
 backend/storage/*.db
 backend/storage/*.db-wal
 backend/storage/*.db-shm
@@ -27,5 +29,3 @@ node_modules/
 robot/xiaozhi-server/data/
 robot/xiaozhi-server/tmp/
 robot/xiaozhi-server/models/
-robot/vision-control/models/
-robot/web-control/models/

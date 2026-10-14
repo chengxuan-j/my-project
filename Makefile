@@ -1,4 +1,4 @@
-.PHONY: dev test lint format migrate docker clean
+.PHONY: dev test lint format migrate clean
 
 dev:
 	cd backend && uvicorn app.main:app --reload
@@ -16,9 +16,6 @@ format:
 # 如需把本地 SQLite 数据迁移到 PostgreSQL，使用下面的脚本：
 migrate:
 	cd backend && python scripts/migrate_sqlite_to_pg.py
-
-docker:
-	docker compose up --build
 
 clean:
 	rm -rf .pytest_cache .mypy_cache .ruff_cache

@@ -9,6 +9,7 @@ pydantic-settings>=2.2
 
 # 持久化：SQLite(开发) / PostgreSQL(生产) + ORM
 sqlalchemy[asyncio]>=2.0
+aiosqlite>=0.20
 asyncpg>=0.29
 alembic>=1.13
 
