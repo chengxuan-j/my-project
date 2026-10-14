@@ -34,7 +34,7 @@ MAGIC = {
 
 def read_llm_config():
     """从 elderly_companion/.env 读 dashscope 配置。"""
-    env_path = r"E:/elderly_companion/.env"
+    env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
     cfg = {}
     with open(env_path, encoding="utf-8") as f:
         for line in f:

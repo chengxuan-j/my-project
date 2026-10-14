@@ -2,6 +2,8 @@
 __pycache__/
 *.pyc
 storage/*.db
+storage/*.db-wal
+storage/*.db-shm
 .pytest_cache/
 
 # 运行日志与产物
@@ -12,10 +14,18 @@ tests_out.txt
 # 前端
 node_modules/
 .next/
+# Next 的历史构建备份目录（.next.old_<ts> / .next.old2_<ts>），上面的 .next/ 规则匹配不到
+.next.old*/
+
+# 代码索引工具生成物
+.codegraph/
 
 # 机器狗 / 小智服务（合并自 xiaozhi-esp32-server）
-xiaozhi-server/data/          # 活配置 .config.yaml 含 API Key，勿入库
-xiaozhi-server/tmp/           # 运行期临时文件
-xiaozhi-server/models/SenseVoiceSmall/   # 897M 本地 ASR 模型，未合并
+# 注意：.gitignore 不支持行尾注释，注释必须单独成行。
+# 否则整行（含 "# 注释"）会被当成一个模式，忽略规则静默失效——
+# 这正是 xiaozhi-server/data/.config.yaml（含 API Key）被提交上去的原因。
+xiaozhi-server/data/
+xiaozhi-server/tmp/
+xiaozhi-server/models/
 vision-control/models/
 web-control/models/
