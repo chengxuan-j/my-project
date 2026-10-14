@@ -1,0 +1,75 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-companion}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-companion}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-please-change-me-in-prod}
+      QWEN_API_KEY: ${QWEN_API_KEY}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
+      SMTP_USE_SSL: ${SMTP_USE_SSL:-false}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      # 容器网络内的小智视觉服务（宿主机同机部署时可留空走默认 127.0.0.1:8003）
+      XIAOZHI_VISION_URL: ${XIAOZHI_VISION_URL:-http://xiaozhi:8003/mcp/vision/explain}
+      # 机器狗固件地址（ESP-Hi /control 接口，局域网 IP）
+      DOG_BASE_URL: ${DOG_BASE_URL:-http://10.1.56.231}
+    restart: unless-stopped
+
+  xiaozhi:
+    image: ghcr.nju.edu.cn/xinnan-tech/xiaozhi-esp32-server:server_latest
+    container_name: xiaozhi-esp32-server
+    restart: unless-stopped
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      - TZ=UTC
+    ports:
+      # WebSocket：ESP32 设备语音通道
+      - "8001:8001"
+      # HTTP：OTA 接口 + MCP 视觉分析接口（老人端拍照走这里）
+      - "8003:8003"
+    volumes:
+      # 活配置（data/.config.yaml，含 OTA 地址 / LLM / 机器狗 IP）
+      - ./xiaozhi-server/data:/opt/xiaozhi-esp32-server/data
+    # 注意：镜像自带完整语音链路；当前配置未启用本地 ASR，
+    # 无需挂载 SenseVoiceSmall 模型（897M，合并时已排除）
+
+  web:
+    build:
+      context: ./web_next
+      args:
+        # 容器网络内后端服务名；Next 在构建期把它作为 /api 代理目标
+        BACKEND_URL: http://api:8000
+    depends_on:
+      - api
+    ports:
+      - "3000:3000"
+    environment:
+      BACKEND_URL: http://api:8000
+    restart: unless-stopped
+
+volumes:
+  pgdata:

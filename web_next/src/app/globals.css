@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-size-base: 18px;
+}
+
+html {
+  font-size: var(--font-size-base);
+}
+
+html.font-large {
+  --font-size-base: 20px;
+}
+
+html.font-xlarge {
+  --font-size-base: 24px;
+}
+
+body {
+  background-color: #FFFBEB;
+  color: #1F2937;
+  min-height: 100vh;
+}
+
+/* 高对比度模式：黑底黄字 */
+html.high-contrast body {
+  background-color: #000;
+  color: #FFEB3B;
+}
+
+html.high-contrast .hc-invert {
+  background-color: #000 !important;
+  color: #FFEB3B !important;
+  border-color: #FFEB3B !important;
+}
+
+html.high-contrast button,
+html.high-contrast a,
+html.high-contrast input,
+html.high-contrast textarea,
+html.high-contrast select {
+  border-color: #FFEB3B !important;
+}
+
+html.high-contrast .bg-white,
+html.high-contrast .bg-warm-bg,
+html.high-contrast .bg-warm-light {
+  background-color: #111 !important;
+  color: #FFEB3B !important;
+}
+
+html.high-contrast .text-gray-900,
+html.high-contrast .text-gray-700,
+html.high-contrast .text-gray-600,
+html.high-contrast .text-gray-500 {
+  color: #FFEB3B !important;
+}

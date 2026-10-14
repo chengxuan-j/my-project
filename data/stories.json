@@ -1,0 +1,44 @@
+[
+  {
+    "title": "回娘家的路",
+    "tags": ["亲情", "怀旧", "温暖"],
+    "mood": ["lonely", "nostalgic", "sad"],
+    "summary": "一位老人坐车回老家，一路上想起年轻时出嫁、进城、儿女成家的点点滴滴，最后在村口听到母亲唤自己的小名。",
+    "length": "short"
+  },
+  {
+    "title": "老槐树下的茶摊",
+    "tags": ["邻里", "怀旧", "温情"],
+    "mood": ["bored", "neutral", "happy"],
+    "summary": "胡同口的老槐树下有个摆了三十年的茶摊，几代人的家常与悲欢都在一壶茶里。",
+    "length": "short"
+  },
+  {
+    "title": "绣花鞋垫",
+    "tags": ["亲情", "手作", "思念"],
+    "mood": ["lonely", "sad", "nostalgic"],
+    "summary": "母亲给远行的女儿一针一线纳鞋垫，女儿走南闯北，鞋垫磨薄了也不舍得扔。",
+    "length": "short"
+  },
+  {
+    "title": "那年冬天的煤炉",
+    "tags": ["生活", "怀旧", "温暖"],
+    "mood": ["neutral", "nostalgic"],
+    "summary": "计划经济年代的冬天，一家人围着煤炉烤红薯、听广播，日子清苦却踏实。",
+    "length": "short"
+  },
+  {
+    "title": "会唱歌的黄鹂鸟",
+    "tags": ["趣味", "轻松", "自然"],
+    "mood": ["happy", "bored"],
+    "summary": "公园里一只黄鹂鸟每天早上准时唱歌，成了附近老人晨练时的老朋友。",
+    "length": "tiny"
+  },
+  {
+    "title": "同桌的你",
+    "tags": ["友情", "怀旧"],
+    "mood": ["nostalgic", "happy"],
+    "summary": "两位分别五十年的老同学在公园重逢，凭着一句当年的暗号认出了彼此。",
+    "length": "short"
+  }
+]

@@ -1,0 +1,31 @@
+# 不包含任何本地模型库（无 torch / transformers / CUDA），模型能力全部走 Qwen API
+fastapi>=0.110
+uvicorn[standard]>=0.29
+httpx>=0.27
+python-dotenv>=1.0
+python-multipart>=0.0.7
+pydantic>=2.6
+pydantic-settings>=2.2
+
+# 持久化：SQLite(开发) / PostgreSQL(生产) + ORM
+sqlalchemy[asyncio]>=2.0
+asyncpg>=0.29
+alembic>=1.13
+
+# Agent 编排（LangGraph + LangChain 工具）
+langgraph>=1.0
+langchain-core>=1.0
+
+# 鉴权
+passlib[bcrypt]>=1.7
+python-jose[cryptography]>=3.3
+
+# 结构化日志
+structlog>=24.1
+
+# 定时任务调度
+apscheduler>=3.10
+
+# 测试
+pytest>=8.0
+pytest-asyncio>=0.23

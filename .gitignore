@@ -1,0 +1,21 @@
+.env
+__pycache__/
+*.pyc
+storage/*.db
+.pytest_cache/
+
+# 运行日志与产物
+*.log
+*.err
+tests_out.txt
+
+# 前端
+node_modules/
+.next/
+
+# 机器狗 / 小智服务（合并自 xiaozhi-esp32-server）
+xiaozhi-server/data/          # 活配置 .config.yaml 含 API Key，勿入库
+xiaozhi-server/tmp/           # 运行期临时文件
+xiaozhi-server/models/SenseVoiceSmall/   # 897M 本地 ASR 模型，未合并
+vision-control/models/
+web-control/models/

@@ -1,0 +1,14 @@
+{
+  "name": "老人情感陪伴 AI",
+  "short_name": "陪伴AI",
+  "description": "为老人提供温暖的情感陪伴",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFFBEB",
+  "theme_color": "#F59E0B",
+  "lang": "zh-CN",
+  "icons": [
+    { "src": "/icons/icon-192.svg", "sizes": "192x192", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icons/icon-512.svg", "sizes": "512x512", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
