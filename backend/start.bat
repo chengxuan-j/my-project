@@ -1,21 +1,24 @@
 @echo off
 REM ============================================================
-REM  è€äººé™ªä¼´åç«¯ - å¯åŠ¨è„šæœ¬
-REM  ç”¨ backend\.venv é‡Œçš„ Python è¿è¡Œ run.pyï¼ˆç›‘å¬ :8000ï¼‰
-REM  åŒå‡»å³å¯
+REM  ÀÏÈËÇé¸ĞÅã°é AI - ºó¶ËÆô¶¯½Å±¾
+REM  ×¢Òâ£º±¾ÎÄ¼ş±ØĞë±£´æÎª GBK/ANSI ±àÂë£¬´æ³É UTF-8 »áÈÃÖĞÎÄÂÒÂë
+REM  ÓÃ backend\.venv ÀïµÄ Python ÔËĞĞ run.py£¨¼àÌı :8000£©
+REM  Ë«»÷¼´¿É
 REM ============================================================
+chcp 936 >nul 2>&1
 setlocal
 cd /d "%~dp0"
 
 set "PYEXE=%~dp0.venv\Scripts\python.exe"
+set "PORT=8000"
 
 if not exist "%PYEXE%" (
     echo.
-    echo   [é”™è¯¯] æœªæ‰¾åˆ°è™šæ‹Ÿç¯å¢ƒ: .venv\Scripts\python.exe
+    echo   [´íÎó] Î´ÕÒµ½ĞéÄâ»·¾³: .venv\Scripts\python.exe
     echo.
-    echo   è¯·å…ˆåœ¨æœ¬ç›®å½•ï¼ˆbackendï¼‰æ‰§è¡Œï¼š
+    echo   ÇëÏÈÔÚ±¾Ä¿Â¼£¨backend£©Ö´ĞĞ£º
     echo       python -m venv .venv
-    echo       .venv\Scripts\pip install -r requirements.txt
+    echo       .venv\Scripts\python.exe -m pip install -r requirements.txt
     echo.
     pause
     exit /b 1
@@ -23,22 +26,36 @@ if not exist "%PYEXE%" (
 
 if not exist "%~dp0.env" (
     echo.
-    echo   [æç¤º] æœªæ‰¾åˆ° backend\.env â€”â€” æœåŠ¡èƒ½æ­£å¸¸å¯åŠ¨ï¼Œä½† /chat ç­‰æ¥å£ä¼šå› ç¼ºå°‘
-    echo          QWEN_API_KEY è¿”å› 502ã€‚éœ€è¦å®Œæ•´åŠŸèƒ½æ—¶ï¼š
+    echo   [ÌáÊ¾] Î´ÕÒµ½ backend\.env ¡ª¡ª ·şÎñÄÜÕı³£Æô¶¯£¬µ« /chat µÈ½Ó¿Ú»áÒòÈ±ÉÙ
+    echo          QWEN_API_KEY ·µ»Ø 502¡£ĞèÒªÍêÕû¹¦ÄÜÊ±£º
     echo              copy ..\.env.example .env
-    echo          å†ç¼–è¾‘ .env å¡«å…¥ QWEN_API_KEYã€‚
+    echo          ÔÙ±à¼­ .env ÌîÈë QWEN_API_KEY¡£
     echo.
+)
+
+REM ¶Ë¿ÚÕ¼ÓÃ¼ì²é£ºÒÑÓĞ½ø³ÌÔÚÅÜÊ±Ö±½ÓÌáÊ¾£¬±ÜÃâ uvicorn Å× WinError 10048
+netstat -ano | findstr /c:"LISTENING" | findstr /c:":%PORT% " >nul 2>&1
+if not errorlevel 1 (
+    echo.
+    echo   [´íÎó] ¶Ë¿Ú %PORT% ÒÑ±»Õ¼ÓÃ£¬±¾·şÎñÎŞ·¨Æô¶¯£¨uvicorn »á±¨ WinError 10048£©¡£
+    echo.
+    echo   ²é¿´Õ¼ÓÃÕß£º  netstat -ano ^| findstr ":%PORT%"
+    echo   ½áÊøÕ¼ÓÃÕß£º  taskkill /PID ^<ÉÏÃæ²éµ½µÄPID^> /F
+    echo   »ò»»¶Ë¿Ú£º    ĞŞ¸Ä run.py ÀïµÄ port=%PORT%
+    echo.
+    pause
+    exit /b 1
 )
 
 echo.
 echo   Python : %PYEXE%
-echo   åœ°å€   : http://127.0.0.1:8000
-echo   æ–‡æ¡£   : http://127.0.0.1:8000/docs
-echo   åœæ­¢   : åœ¨æœ¬çª—å£æŒ‰ Ctrl+C
+echo   µØÖ·   : http://127.0.0.1:%PORT%
+echo   ÎÄµµ   : http://127.0.0.1:%PORT%/docs
+echo   Í£Ö¹   : ÔÚ±¾´°¿Ú°´ Ctrl+C
 echo.
 
 "%PYEXE%" run.py
 
 echo.
-echo   æœåŠ¡å·²é€€å‡ºã€‚
+echo   ·şÎñÒÑÍË³ö¡£
 pause
