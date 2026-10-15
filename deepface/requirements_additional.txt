@@ -1,0 +1,14 @@
+mediapipe>=0.8.7.3
+dlib>=19.20.0
+ultralytics>=8.1.6
+facenet-pytorch>=2.5.3
+torch>=2.1.2
+insightface>=0.7.3
+tf-keras
+typing-extensions
+pydantic
+albumentations
+grpcio>=1.48.0
+grpcio-tools>=1.48.0
+boto3>=1.28.3
+pyarrow>=14.0.1

@@ -37,5 +37,6 @@ robot/xiaozhi-server/data/
 robot/xiaozhi-server/tmp/
 robot/xiaozhi-server/models/
 
-# DeepFace 库源码（pip install -e ./deepface 装的，属于依赖不属于本项目代码）
-/deepface/
+# DeepFace 库源码（pip install -e ./deepface 安装，源码一并纳入仓库；
+# 只忽略 pip 可编辑安装在本机生成的构建残留）
+/deepface/deepface.egg-info/
