@@ -225,11 +225,35 @@ export interface EmotionRecord {
   created_at: string;
 }
 
+/** 摄像头表情识别结果（DeepFace，POST /emotion/face） */
+export interface FaceEmotionResult {
+  face_found: boolean;
+  emotion: string;
+  emotion_label: string;
+  score: number;
+  scores: Record<string, number>;
+  region?: { x: number; y: number; w: number; h: number } | null;
+  dog_reacted: boolean;
+  dog_reached: boolean;
+  speech: string;
+  created_at: string;
+}
+
 export const emotionApi = {
   history: (limit = 20) =>
     api<{ records: EmotionRecord[] }>(`/emotion/history?limit=${limit}`),
   trend: (days = 7) =>
     api<EmotionTrendDay[]>(`/emotion/trend?days=${days}`),
+  /** 摄像头抓帧 → 后端 DeepFace 表情识别（react=true 时持续负面会触发狗安慰） */
+  face: (file: Blob, react = false) => {
+    const fd = new FormData();
+    fd.append('file', file, 'face.jpg');
+    fd.append('react', react ? 'true' : 'false');
+    return api<FaceEmotionResult>('/emotion/face', {
+      method: 'POST',
+      formData: fd,
+    });
+  },
 };
 
 export interface MemoryItem {

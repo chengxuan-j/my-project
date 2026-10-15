@@ -29,3 +29,6 @@ node_modules/
 robot/xiaozhi-server/data/
 robot/xiaozhi-server/tmp/
 robot/xiaozhi-server/models/
+
+# DeepFace 库源码（pip install -e ./deepface 装的，属于依赖不属于本项目代码）
+/deepface/

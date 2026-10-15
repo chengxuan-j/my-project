@@ -173,6 +173,21 @@ class EmotionTrendDay(BaseModel):
     record_count: int
 
 
+# ---------- Face Emotion（DeepFace 表情识别） ----------
+
+class FaceEmotionResponse(BaseModel):
+    face_found: bool
+    emotion: str = ""                # deepface 原生标签（happy/sad/...）
+    emotion_label: str = ""          # 中文标签
+    score: float = 0.0               # 主表情置信度 0~100
+    scores: dict[str, float] = {}    # 7 类表情得分
+    region: Optional[dict] = None    # 人脸框 {x,y,w,h}
+    dog_reacted: bool = False        # 是否触发了机器狗安慰
+    dog_reached: bool = False        # 狗是否实际收到指令
+    speech: str = ""                 # 安慰时说的话
+    created_at: str = ""
+
+
 # ---------- Feedback ----------
 
 class RecommendationFeedbackRequest(BaseModel):

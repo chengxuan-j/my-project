@@ -19,6 +19,7 @@ from app.companion.prompts import build_messages
 from app.emotion.emotion_analyzer import AnalysisResult, EmotionAnalyzer
 from app.llm.qwen_client import QwenClient
 from app.memory.memory_manager import MemoryManager
+from app.services.face_emotion import face_emotion
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +106,20 @@ async def generate_reply(user_id: str, message: str,
     """回复生成工具：注入画像+记忆+情境+策略，调用 Qwen 生成。"""
     ctx = context["_ctx"]
     messages = build_messages(ctx, message)
+    # 摄像头表情识别结果（5 分钟内有效）作为额外情境注入，
+    # 让回复语气贴合老人当下表情；没有识别记录时完全不影响原链路
+    latest_face = face_emotion.latest(user_id)
+    if latest_face:
+        minutes = latest_face["age_seconds"] // 60
+        when = "刚才" if minutes < 1 else f"{minutes} 分钟前"
+        messages.append({
+            "role": "system",
+            "content": (
+                f"[实时表情] 摄像头识别到老人{when}的表情是"
+                f"「{latest_face['label_cn']}」（置信度 {latest_face['score']:.0f}%）。"
+                "请在回复中自然照顾到这一情绪，不必点破摄像头。"
+            ),
+        })
     # DEBUG: 打印画像和 system prompt 关键部分
     logger.info("[DEBUG] user_id=%s, profile_name=%s, prompt_block=%s",
                 user_id, ctx.profile.name, ctx.profile.prompt_block())

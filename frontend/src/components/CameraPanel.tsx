@@ -2,13 +2,27 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { VisionEngine, Action, CHEATSHEET } from '@/lib/visionEngine';
-import { dogApi, speechApi } from '@/lib/api';
+import { dogApi, speechApi, emotionApi, ApiError } from '@/lib/api';
+import type { FaceEmotionResult } from '@/lib/api';
 
 interface CameraPanelProps {
   onClose: () => void;
   /** 语音识别为非动作指令时，把文字交给父组件（如发到聊天） */
   onVoice?: (text: string) => void;
 }
+
+/** 面板模式：手势指挥机器狗 / 表情识别（DeepFace） */
+type CameraMode = 'gesture' | 'emotion';
+
+/** deepface 表情 → emoji / 中文（与后端返回的 emotion_label 一致，此处仅前端展示用） */
+const EMOTION_EMOJI: Record<string, string> = {
+  happy: '😊', sad: '😢', angry: '😠', fear: '😨',
+  disgust: '🤢', surprise: '😲', neutral: '😌',
+};
+const EMOTION_CN: Record<string, string> = {
+  happy: '开心', sad: '难过', angry: '生气', fear: '害怕',
+  disgust: '厌恶', surprise: '惊讶', neutral: '平静',
+};
 
 /** 语音关键词 → 狗动作 key（必须和后端 dog_control.KEY_MAP 一致） */
 const VOICE_ACTION_MAP: Record<string, string> = {
@@ -28,6 +42,9 @@ const ACTION_LABEL: Record<string, string> = {
   stop: '停止', sit: '鞠躬', stand: '握手', stretch: '伸懒腰', shake: '摇摆',
 };
 
+/** 表情识别抓帧间隔（毫秒）：5 秒一帧，够用且不压垮后端 CPU */
+const EMOTION_INTERVAL_MS = 5000;
+
 export function CameraPanel({ onClose, onVoice }: CameraPanelProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -36,6 +53,18 @@ export function CameraPanel({ onClose, onVoice }: CameraPanelProps) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [cameraError, setCameraError] = useState('');
+
+  // 面板模式：手势指挥 / 表情识别
+  const [mode, setMode] = useState<CameraMode>('gesture');
+  const modeRef = useRef<CameraMode>('gesture');
+  const [faceResult, setFaceResult] = useState<FaceEmotionResult | null>(null);
+  const [faceBusy, setFaceBusy] = useState(false);
+  const [faceError, setFaceError] = useState('');
+  const faceResultRef = useRef<FaceEmotionResult | null>(null);
+  const faceBusyRef = useRef(false);
+  const captureScaleRef = useRef(1); // 抓帧缩放比：后端返回的人脸框坐标要除以它映射回视频
+  const emotionTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const emotionRafRef = useRef(0);
 
   const [status, setStatus] = useState({
     currentAction: null as string | null,
@@ -51,6 +80,7 @@ export function CameraPanel({ onClose, onVoice }: CameraPanelProps) {
   } | null>(null);
 
   const [ttsSpeaking, setTtsSpeaking] = useState(false);
+  const ttsSpeakingRef = useRef(false);
 
   // 语音控制状态
   const [recording, setRecording] = useState(false);
@@ -161,7 +191,10 @@ export function CameraPanel({ onClose, onVoice }: CameraPanelProps) {
           return;
         }
         engineRef.current = engine;
-        engine.start(video, canvas);
+        // 表情模式下不启动手势引擎（省 CPU），由模式切换 effect 接管
+        if (modeRef.current === 'gesture') {
+          engine.start(video, canvas);
+        }
         setLoading(false);
       } catch (err) {
         if (mounted) {
@@ -192,9 +225,164 @@ export function CameraPanel({ onClose, onVoice }: CameraPanelProps) {
     };
   }, [cameraError, ttsSpeaking]);
 
+  // ---------- 表情识别模式 ----------
+  // 抓一帧（缩到 640 宽，降低上传与推理耗时）→ POST /emotion/face → 更新叠加层
+  const captureAndAnalyze = useCallback(async () => {
+    const video = videoRef.current;
+    if (!video || video.readyState < 2 || faceBusyRef.current) return;
+    faceBusyRef.current = true;
+    setFaceBusy(true);
+    try {
+      const vw = video.videoWidth;
+      const vh = video.videoHeight;
+      if (!vw || !vh) return;
+      const capW = Math.min(640, vw);
+      const scale = capW / vw;
+      const off = document.createElement('canvas');
+      off.width = capW;
+      off.height = Math.round(vh * scale);
+      off.getContext('2d')!.drawImage(video, 0, 0, off.width, off.height);
+      captureScaleRef.current = scale;
+      const blob = await new Promise<Blob | null>((res) =>
+        off.toBlob(res, 'image/jpeg', 0.85)
+      );
+      if (!blob) return;
+
+      const res = await emotionApi.face(blob, true);
+      faceResultRef.current = res;
+      setFaceResult(res);
+      setFaceError('');
+
+      // 后端判定表情持续约 5 秒 → 机器狗已做反应动作，这里补播对应的话
+      if (res.dog_reacted && res.speech) {
+        setLastDogAction({
+          label: res.emotion === 'happy' ? '陪您开心' : '安慰您',
+          reached: res.dog_reached,
+          ts: Date.now(),
+        });
+        if (!ttsSpeakingRef.current) {
+          ttsSpeakingRef.current = true;
+          setTtsSpeaking(true);
+          try {
+            const tts = await speechApi.tts(res.speech);
+            const audio = new Audio(tts.audio_url);
+            audio.onended = () => {
+              ttsSpeakingRef.current = false;
+              setTtsSpeaking(false);
+            };
+            audio.onerror = () => {
+              ttsSpeakingRef.current = false;
+              setTtsSpeaking(false);
+            };
+            await audio.play();
+          } catch {
+            ttsSpeakingRef.current = false;
+            setTtsSpeaking(false);
+          }
+        }
+      }
+    } catch (e) {
+      // 503 = 后端未装 deepface 等；401 由 api.ts 统一处理
+      setFaceError(
+        e instanceof ApiError ? e.message : '表情识别暂时不可用，稍后自动重试'
+      );
+    } finally {
+      faceBusyRef.current = false;
+      setFaceBusy(false);
+    }
+  }, []);
+
+  // 表情模式下的画面绘制：镜像视频帧 + 人脸框 + 表情标签（与手势引擎同风格）
+  const drawEmotionOverlay = useCallback(() => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas || video.readyState < 2) return;
+    const w = video.videoWidth;
+    const h = video.videoHeight;
+    if (!w || !h) return;
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, w, h);
+    ctx.save();
+    ctx.translate(w, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0, w, h);
+    ctx.restore();
+
+    const r = faceResultRef.current;
+    if (!r?.face_found || !r.region) return;
+
+    const s = captureScaleRef.current || 1;
+    const bw = r.region.w / s;
+    const bh = r.region.h / s;
+    const bx = w - r.region.x / s - bw; // 画面是镜像的，方框 x 要翻转
+    const by = r.region.y / s;
+
+    ctx.lineWidth = Math.max(3, w / 180);
+    ctx.strokeStyle = '#22C55E';
+    ctx.strokeRect(bx, by, bw, bh);
+
+    const label = `${EMOTION_EMOJI[r.emotion] ?? ''} ${r.emotion_label} ${Math.round(r.score)}%`;
+    const fontSize = Math.max(22, Math.round(w / 24));
+    ctx.font = `bold ${fontSize}px sans-serif`;
+    const tw = ctx.measureText(label).width;
+    const ly = Math.max(0, by - fontSize * 1.45);
+    ctx.fillStyle = 'rgba(34,197,94,0.85)';
+    ctx.fillRect(bx, ly, tw + fontSize * 0.8, fontSize * 1.3);
+    ctx.fillStyle = '#fff';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, bx + fontSize * 0.4, ly + fontSize * 0.68);
+  }, []);
+
+  // 模式切换：手势模式跑 MediaPipe 引擎；表情模式暂停引擎、定时抓帧 + 自绘画面
+  useEffect(() => {
+    if (loading || loadError || cameraError) return;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return;
+
+    if (mode === 'gesture') {
+      engineRef.current?.start(video, canvas);
+      return () => {
+        engineRef.current?.stop();
+      };
+    }
+
+    engineRef.current?.stop();
+    faceResultRef.current = null;
+    setFaceResult(null);
+    setFaceError('');
+
+    captureAndAnalyze(); // 进入模式立即识别一次
+    emotionTimerRef.current = setInterval(captureAndAnalyze, EMOTION_INTERVAL_MS);
+
+    const loop = () => {
+      drawEmotionOverlay();
+      emotionRafRef.current = requestAnimationFrame(loop);
+    };
+    emotionRafRef.current = requestAnimationFrame(loop);
+
+    return () => {
+      if (emotionTimerRef.current) clearInterval(emotionTimerRef.current);
+      emotionTimerRef.current = null;
+      cancelAnimationFrame(emotionRafRef.current);
+    };
+  }, [mode, loading, loadError, cameraError, captureAndAnalyze, drawEmotionOverlay]);
+
+  const switchMode = (m: CameraMode) => {
+    modeRef.current = m;
+    setMode(m);
+  };
+
   const handleClose = useCallback(() => {
     engineRef.current?.stop();
     engineRef.current = null;
+    if (emotionTimerRef.current) clearInterval(emotionTimerRef.current);
+    emotionTimerRef.current = null;
+    cancelAnimationFrame(emotionRafRef.current);
     const video = videoRef.current;
     if (video?.srcObject) {
       (video.srcObject as MediaStream).getTracks().forEach((t) => t.stop());
@@ -327,14 +515,39 @@ export function CameraPanel({ onClose, onVoice }: CameraPanelProps) {
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col">
       {/* 顶部栏 */}
-      <div className="flex items-center justify-between px-4 py-3 bg-black/60">
-        <h2 className="text-white text-2xl font-bold">🎥 动作指挥小狗</h2>
-        <button
-          onClick={handleClose}
-          className="w-12 h-12 rounded-full bg-white/20 text-white text-2xl font-bold hover:bg-white/30"
-        >
-          ✕
-        </button>
+      <div className="flex items-center justify-between px-4 py-3 bg-black/60 gap-3 flex-wrap">
+        <h2 className="text-white text-2xl font-bold">
+          {mode === 'gesture' ? '🎥 动作指挥小狗' : '😊 表情识别'}
+        </h2>
+        <div className="flex items-center gap-2">
+          {/* 模式切换 */}
+          <div className="flex rounded-full overflow-hidden border border-white/30">
+            <button
+              type="button"
+              onClick={() => switchMode('gesture')}
+              className={`px-4 py-2 text-sm font-bold transition-colors ${
+                mode === 'gesture' ? 'bg-warm-primary text-white' : 'bg-black/40 text-white/70'
+              }`}
+            >
+              🐕 指挥小狗
+            </button>
+            <button
+              type="button"
+              onClick={() => switchMode('emotion')}
+              className={`px-4 py-2 text-sm font-bold transition-colors ${
+                mode === 'emotion' ? 'bg-warm-primary text-white' : 'bg-black/40 text-white/70'
+              }`}
+            >
+              😊 表情识别
+            </button>
+          </div>
+          <button
+            onClick={handleClose}
+            className="w-12 h-12 rounded-full bg-white/20 text-white text-2xl font-bold hover:bg-white/30"
+          >
+            ✕
+          </button>
+        </div>
       </div>
 
       {/* 视频区 */}
@@ -380,22 +593,75 @@ export function CameraPanel({ onClose, onVoice }: CameraPanelProps) {
         {/* HUD 叠加层 */}
         {!loading && !loadError && !cameraError && (
           <>
-            {/* 左上角：当前姿势 + 进度条 */}
-            <div className="absolute top-4 left-4 bg-black/50 rounded-xl px-4 py-3 text-white min-w-[220px]">
-              <p className="text-lg font-bold">
-                {status.currentAction ?? '中立位'}
-              </p>
-              <div className="w-full h-3 bg-white/20 rounded-full mt-2 overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all"
-                  style={{
-                    width: `${Math.round(status.progress * 100)}%`,
-                    backgroundColor: progressColor,
-                  }}
-                />
+            {/* 左上角：手势模式 = 当前姿势 + 进度条；表情模式 = 识别结果 */}
+            {mode === 'gesture' ? (
+              <div className="absolute top-4 left-4 bg-black/50 rounded-xl px-4 py-3 text-white min-w-[220px]">
+                <p className="text-lg font-bold">
+                  {status.currentAction ?? '中立位'}
+                </p>
+                <div className="w-full h-3 bg-white/20 rounded-full mt-2 overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${Math.round(status.progress * 100)}%`,
+                      backgroundColor: progressColor,
+                    }}
+                  />
+                </div>
+                <p className="text-sm mt-1 text-white/80">{statusText}</p>
               </div>
-              <p className="text-sm mt-1 text-white/80">{statusText}</p>
-            </div>
+            ) : (
+              <div className="absolute top-4 left-4 bg-black/50 rounded-xl px-4 py-3 text-white min-w-[240px]">
+                {faceError ? (
+                  <p className="text-amber-300 text-base">{faceError}</p>
+                ) : !faceResult ? (
+                  <p className="text-lg font-bold">
+                    {faceBusy ? '正在识别您的表情…' : '表情识别就绪'}
+                  </p>
+                ) : !faceResult.face_found ? (
+                  <p className="text-lg font-bold">没看到您的脸 😊</p>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-3">
+                      <span className="text-5xl leading-none">
+                        {EMOTION_EMOJI[faceResult.emotion] ?? '🙂'}
+                      </span>
+                      <div>
+                        <p className="text-2xl font-bold">
+                          {faceResult.emotion_label}
+                        </p>
+                        <p className="text-sm text-white/80">
+                          置信度 {Math.round(faceResult.score)}%
+                          {faceBusy && ' · 识别中…'}
+                        </p>
+                      </div>
+                    </div>
+                    {/* 前三得分条 */}
+                    <div className="mt-3 space-y-1">
+                      {Object.entries(faceResult.scores)
+                        .sort((a, b) => b[1] - a[1])
+                        .slice(0, 3)
+                        .map(([k, v]) => (
+                          <div key={k} className="flex items-center gap-2">
+                            <span className="text-xs text-white/70 w-10">
+                              {EMOTION_CN[k] ?? k}
+                            </span>
+                            <div className="flex-1 h-2 bg-white/20 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-green-400 rounded-full"
+                                style={{ width: `${Math.min(100, Math.round(v))}%` }}
+                              />
+                            </div>
+                            <span className="text-xs text-white/60 w-10 text-right">
+                              {Math.round(v)}%
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
 
             {/* 右上角：最近动作 */}
             {lastDogAction && Date.now() - lastDogAction.ts < 5000 && (
@@ -412,7 +678,12 @@ export function CameraPanel({ onClose, onVoice }: CameraPanelProps) {
 
             {/* 右下角：FPS/状态 */}
             <div className="absolute bottom-4 right-4 bg-black/40 rounded-lg px-3 py-1 text-white/60 text-sm">
-              {voiceHint || (ttsSpeaking ? '🔊 播报中…' : '视觉引擎运行中')}
+              {voiceHint ||
+                (ttsSpeaking
+                  ? '🔊 播报中…'
+                  : mode === 'gesture'
+                    ? '视觉引擎运行中'
+                    : '表情识别中 · 每 5 秒自动检测')}
             </div>
           </>
         )}
@@ -469,25 +740,36 @@ export function CameraPanel({ onClose, onVoice }: CameraPanelProps) {
         </div>
       )}
 
-      {/* 底部：姿势速查表 */}
+      {/* 底部：姿势速查表（手势模式）/ 表情模式说明 */}
       {!loading && !loadError && !cameraError && (
         <div className="bg-neutral-900 px-4 py-3">
-          <p className="text-white/60 text-sm mb-2 text-center">对着摄像头做这些动作，小狗就会回应您</p>
-          <div className="flex flex-wrap justify-center gap-2">
-            {CHEATSHEET.map((a) => (
-              <div
-                key={a.key}
-                className={`px-3 py-2 rounded-lg text-center min-w-[90px] ${
-                  status.currentAction === a.label
-                    ? 'bg-green-600 text-white'
-                    : 'bg-white/10 text-white/80'
-                }`}
-              >
-                <p className="text-lg font-bold">{a.label}</p>
-                <p className="text-xs opacity-70">{a.hint}</p>
+          {mode === 'gesture' ? (
+            <>
+              <p className="text-white/60 text-sm mb-2 text-center">
+                对着摄像头做这些动作，小狗就会回应您
+              </p>
+              <div className="flex flex-wrap justify-center gap-2">
+                {CHEATSHEET.map((a) => (
+                  <div
+                    key={a.key}
+                    className={`px-3 py-2 rounded-lg text-center min-w-[90px] ${
+                      status.currentAction === a.label
+                        ? 'bg-green-600 text-white'
+                        : 'bg-white/10 text-white/80'
+                    }`}
+                  >
+                    <p className="text-lg font-bold">{a.label}</p>
+                    <p className="text-xs opacity-70">{a.hint}</p>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </>
+          ) : (
+            <p className="text-white/60 text-sm text-center">
+              对着摄像头，我就能读懂您的表情 😊
+              开心或难过持续 5 秒，小狗就会做出回应；结果也会同步给家人的看板
+            </p>
+          )}
         </div>
       )}
     </div>

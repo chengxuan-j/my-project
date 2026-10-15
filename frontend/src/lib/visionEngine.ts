@@ -380,6 +380,7 @@ export class VisionEngine {
   }
 
   start(video: HTMLVideoElement, canvas: HTMLCanvasElement) {
+    if (this._running) return; // 防止重复启动导致双重 rAF 循环
     this._running = true;
     this.drawingUtils = new DrawingUtils(canvas.getContext("2d")!);
 

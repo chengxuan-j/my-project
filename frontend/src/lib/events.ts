@@ -8,7 +8,13 @@ export interface ServerEvent {
 }
 
 /** 订阅的后端事件类型 */
-const EVENT_TYPES = ['family_message', 'family_message_read', 'family_digest', 'dog_relay'];
+const EVENT_TYPES = [
+  'family_message',
+  'family_message_read',
+  'family_digest',
+  'dog_relay',
+  'face_emotion',
+];
 
 /**
  * SSE 基址：

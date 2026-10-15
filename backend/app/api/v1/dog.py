@@ -3,7 +3,6 @@ import logging
 from datetime import datetime
 from typing import List
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,7 +14,7 @@ from app.db.base import get_db
 from app.db.models import Account
 from app.repositories.family_message_repo import FamilyMessageRepo
 from app.repositories.profile_repo import FamilyRepo
-from app.services.dog_control import KEY_MAP, execute_actions, execute_stop
+from app.services.dog_control import KEY_MAP, execute_actions, execute_stop, push_to_dog
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/dog", tags=["机器狗"])
@@ -35,37 +34,6 @@ class DogActionResponse(BaseModel):
 
 
 VALID_KEYS = set(KEY_MAP.keys())
-
-
-async def push_to_dog(text: str) -> bool:
-    """把一句话推给当前已连接小智服务端的机器狗，让它开口念出来。
-
-    返回 True 表示已成功下发朗读任务（不代表狗一定播放成功）。
-    狗未连接 / 小智服务不可达时静默失败，不影响主流程（SSE 仍会推老人端 TTS）。
-    """
-    settings = get_settings()
-    # 从视觉地址推导出小智 HTTP 基址：http://127.0.0.1:8003/mcp/... -> http://127.0.0.1:8003
-    base = settings.xiaozhi_vision_url.split("/mcp", 1)[0].rstrip("/")
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            r = await client.get(f"{base}/devices")
-            if r.status_code != 200:
-                return False
-            devices = (r.json() or {}).get("online_devices") or []
-            if not devices:
-                logger.info("push_to_dog: 当前没有已连接的狗设备，跳过发声")
-                return False
-            dev = devices[0]
-            resp = await client.post(
-                f"{base}/devices/{dev}/say",
-                json={"text": text},
-            )
-            ok = resp.status_code == 200
-            logger.info("push_to_dog -> device=%s ok=%s", dev, ok)
-            return ok
-    except Exception as e:  # noqa: BLE001
-        logger.warning("push_to_dog 失败（狗未连或不可达）: %s", e)
-        return False
 
 
 

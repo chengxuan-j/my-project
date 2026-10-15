@@ -44,6 +44,19 @@ function parseDigest(content: string): DigestPayload | null {
   return null;
 }
 
+/** 老人当前表情（来自摄像头表情识别的 SSE 实时推送） */
+interface LiveEmotion {
+  emotion: string;
+  label: string;
+  score: number;
+  ts: number;
+}
+
+const EMOTION_EMOJI: Record<string, string> = {
+  happy: '😊', sad: '😢', angry: '😠', fear: '😨',
+  disgust: '🤢', surprise: '😲', neutral: '😌',
+};
+
 /** 每日陪伴日报卡片（系统推送，区别于普通留言） */
 function DigestCard({ msg, onRead }: { msg: FamilyMessageItem; onRead: (id: number) => void }) {
   const digest = parseDigest(msg.content);
@@ -137,6 +150,8 @@ export default function FamilyPage() {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  // 老人实时表情（摄像头表情识别推送）：elderly_id → 最新一次识别
+  const [liveEmotions, setLiveEmotions] = useState<Record<string, LiveEmotion>>({});
 
   // 让小狗传话（仅传话，不指挥动作）
   const RELATIONS = ['女儿', '儿子', '孙女', '孙子', '外孙女', '外孙', '儿媳', '女婿'];
@@ -200,10 +215,33 @@ export default function FamilyPage() {
     }
   };
 
-  // SSE：老人发来的留言 / 回应实时到达，无需手动刷新
+  // SSE：老人发来的留言 / 回应 / 实时表情识别结果，无需手动刷新
   useServerEvents(
     accessToken,
-    () => {
+    (e) => {
+      if (e.type === 'face_emotion') {
+        const uid = String(e.user_id ?? '');
+        const emotion = String(e.emotion ?? '');
+        if (uid && emotion) {
+          setLiveEmotions((prev) => ({
+            ...prev,
+            [uid]: {
+              emotion,
+              label: String(e.emotion_label ?? emotion),
+              score: Number(e.score ?? 0),
+              ts: Date.now(),
+            },
+          }));
+          // 正在看这位老人的情绪历史时，把新识别实时补进列表
+          if (selectedId === uid) {
+            setRecords((prev) => [
+              { emotion, intensity: Number(e.score ?? 0) / 100, created_at: String(e.created_at ?? '') },
+              ...prev,
+            ]);
+          }
+        }
+        return;
+      }
       if (msgTarget) loadSent(msgTarget);
     },
     !!hydrated && user?.role === 'family'
@@ -431,6 +469,57 @@ export default function FamilyPage() {
           ))}
         </div>
       </section>
+
+      {/* 家人实时情绪：老人端开着「表情识别」时，这里实时刷新 */}
+      {elderlyList.some((e) => liveEmotions[e.elderly_id]) && (
+        <section className="rounded-2xl bg-white border-2 border-emerald-200 p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">😊 家人实时情绪</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                老人端摄像头表情识别开启时，情绪状态实时同步
+              </p>
+            </div>
+            <span className="flex items-center gap-1 text-xs font-semibold text-emerald-600">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> 实时
+            </span>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {elderlyList
+              .filter((e) => liveEmotions[e.elderly_id])
+              .map((e) => {
+                const live = liveEmotions[e.elderly_id];
+                const negative = ['sad', 'angry', 'fear', 'disgust'].includes(live.emotion);
+                return (
+                  <div
+                    key={e.elderly_id}
+                    className={`rounded-xl p-4 border-2 ${
+                      negative ? 'bg-amber-50 border-amber-300' : 'bg-emerald-50 border-emerald-200'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-4xl leading-none">
+                        {EMOTION_EMOJI[live.emotion] ?? '🙂'}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-gray-900">
+                          {e.name || e.username}
+                        </p>
+                        <p className="text-gray-700">
+                          {live.label} · 置信度 {Math.round(live.score)}%
+                        </p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          更新于 {new Date(live.ts).toLocaleTimeString('zh-CN')}
+                          {negative && ' · 建议打个电话关心一下'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        </section>
+      )}
 
       <section className="grid lg:grid-cols-[1.35fr_1fr] gap-5">
         <div className="rounded-2xl bg-white border border-slate-200 p-5 shadow-sm">
