@@ -1,0 +1,504 @@
+{
+  "user_id": "elderly_001",
+  "profile": {
+    "name": "王阿姨",
+    "age": 72,
+    "gender": "女",
+    "birth_year": 1954,
+    "life_experience": ["年轻时在纺织厂工作"],
+    "family": ["女儿小芳"]
+  },
+  "note": "M-1 演示语料。人物设定与 profile/elderly_profile.py 的 elderly_001（王阿姨，72，纺织厂）保持一致，并按 birth_year=1954 推出内部自洽的生平时间线：1970(16岁)初中毕业赴黑龙江生产建设兵团 → 1973(19岁)返城进纺织厂当挡车工 → 1978 结婚 → 1980 女儿小芳出生 → 1988 当小组长 → 1996 下岗 → 2004 退休 → 2018 老伴去世。label 字段即人工真值，供 scripts/eval_story_extraction.py 计算 precision/recall。split=train 用于调参，split=holdout 仅用于验收（防过拟合）。",
+  "timeline_anchor": [
+    {"year": 1970, "event": "赴黑龙江生产建设兵团"},
+    {"year": 1973, "event": "返城进纺织厂"},
+    {"year": 1978, "event": "结婚"},
+    {"year": 1980, "event": "女儿小芳出生"},
+    {"year": 1988, "event": "当上小组长"},
+    {"year": 1996, "event": "下岗"},
+    {"year": 2004, "event": "退休"},
+    {"year": 2018, "event": "老伴去世"}
+  ],
+  "turns": [
+    {
+      "id": 1,
+      "split": "train",
+      "topic": "纺织厂",
+      "user": "我年轻时候在纺织厂上班，挡车工，干了二十来年。",
+      "assistant": "二十来年，那可不是一段短日子。您刚进厂的时候还记得是什么样的吗？",
+      "label": {"is_life_story": true, "era_tags": [], "emotion_tone": "平淡", "missing": ["具体年份", "进厂时的情形"], "note": "职业经历，时间模糊"}
+    },
+    {
+      "id": 2,
+      "split": "train",
+      "topic": "纺织厂",
+      "user": "那车间里机器响得厉害，面对面说话都听不见，全凭打手势。",
+      "assistant": "机器一响就听不见人说话，那可真吵。你们平时就靠打手势呀？",
+      "label": {"is_life_story": true, "era_tags": [], "emotion_tone": "辛酸", "missing": ["车间具体做什么工序"], "note": "场景细节，感官记忆"}
+    },
+    {
+      "id": 3,
+      "split": "train",
+      "topic": "纺织厂",
+      "user": "我们那时候三班倒，赶上夜班，半夜十二点接班，困得眼睛都睁不开。",
+      "assistant": "半夜接班最熬人了。上夜班的时候，您是怎么撑过来的？",
+      "label": {"is_life_story": true, "era_tags": [], "emotion_tone": "辛酸", "missing": ["夜班持续了几年"], "note": "工作制度，身体记忆"}
+    },
+    {
+      "id": 4,
+      "split": "train",
+      "topic": "纺织厂",
+      "user": "刚去的时候有个老师傅带我，接线头，断一根接一根，手指头都磨破了。",
+      "assistant": "手指都磨破了，那是真下功夫学的。老师傅对您严格吗？",
+      "label": {"is_life_story": true, "era_tags": [], "emotion_tone": "平淡", "missing": ["师傅的名字", "学了多久出师"], "note": "学艺经历"}
+    },
+    {
+      "id": 5,
+      "split": "train",
+      "topic": "纺织厂",
+      "user": "头一回领工资，我记着是三十几块钱，拿在手里都不知道往哪儿放。",
+      "assistant": "第一次拿到自己挣的钱，心里肯定不一样。那钱后来怎么花的还记得吗？",
+      "label": {"is_life_story": true, "era_tags": [], "emotion_tone": "自豪", "missing": ["具体金额", "哪一年"], "note": "重要人生节点"}
+    },
+    {
+      "id": 6,
+      "split": "train",
+      "topic": "天气",
+      "user": "今天太阳好，我坐阳台上晒了一会儿。",
+      "assistant": "晒太阳舒服，晒晒背对身体也好。您那边今天风大不大？",
+      "label": {"is_life_story": false, "note": "当下日常"}
+    },
+    {
+      "id": 7,
+      "split": "train",
+      "topic": "吃饭",
+      "user": "早晨喝了碗粥，配点咸菜，就够了。",
+      "assistant": "早饭清淡点好。中午打算吃点什么呀？",
+      "label": {"is_life_story": false, "note": "当下日常"}
+    },
+    {
+      "id": 8,
+      "split": "holdout",
+      "topic": "票证",
+      "user": "那时候买米买面都得要粮票，一个月就那么点，得算着吃。",
+      "assistant": "粮票得省着用，一顿都不敢多。您家那时候几口人的口粮呀？",
+      "label": {"is_life_story": true, "era_tags": ["票证年代"], "emotion_tone": "平淡", "missing": ["具体哪一年", "家里几口人"], "note": "时代锚点明确"}
+    },
+    {
+      "id": 9,
+      "split": "train",
+      "topic": "票证",
+      "user": "过年做件新衣裳，得攒大半年的布票，我娘给我做的。",
+      "assistant": "攒大半年票才做一件，那件衣裳肯定金贵。是什么颜色的还记得吗？",
+      "label": {"is_life_story": true, "era_tags": ["票证年代"], "emotion_tone": "温暖", "missing": ["衣裳的颜色", "哪一年"], "note": "含母亲出场"}
+    },
+    {
+      "id": 10,
+      "split": "holdout",
+      "topic": "知青年代",
+      "user": "我十六岁那年就下乡了，去的黑龙江，生产建设兵团。",
+      "assistant": "十六岁就出远门，离家那么远。您还记得刚到那儿是什么感觉吗？",
+      "label": {"is_life_story": true, "era_tags": ["知青年代"], "emotion_tone": "辛酸", "missing": ["哪一年", "待了几年"], "note": "知青锚点+地点+年龄"}
+    },
+    {
+      "id": 11,
+      "split": "train",
+      "topic": "知青年代",
+      "user": "在兵团天天开荒割麦子，手上全是口子，晚上倒头就睡。",
+      "assistant": "干农活的苦是实打实的。你们一个班多少人一起干呀？",
+      "label": {"is_life_story": true, "era_tags": ["知青年代"], "emotion_tone": "辛酸", "missing": ["具体连队", "干了几年"], "note": "劳动细节"}
+    },
+    {
+      "id": 12,
+      "split": "holdout",
+      "topic": "知青年代",
+      "user": "跟我一块儿去的有个老王，北京来的，我俩睡的上下铺。",
+      "assistant": "一块儿下乡的伙伴最亲。你们后来一直有联系吗？",
+      "label": {"is_life_story": true, "era_tags": ["知青年代"], "emotion_tone": "温暖", "missing": ["老王的全名", "后来是否联系"], "note": "具名人物"}
+    },
+    {
+      "id": 13,
+      "split": "train",
+      "topic": "知青年代",
+      "user": "家里来信，我妈说家里都好，让我别惦记，我拿着信哭了一晚上。",
+      "assistant": "那封信您肯定反复看了好多遍吧。想家的时候最难熬了。",
+      "label": {"is_life_story": true, "era_tags": ["知青年代"], "emotion_tone": "辛酸", "missing": ["信里还说了什么"], "note": "情绪高点，含母亲"}
+    },
+    {
+      "id": 14,
+      "split": "train",
+      "topic": "返城",
+      "user": "后来政策变了，我七三年才回城，进了纺织厂。",
+      "assistant": "七三年回城，那在黑龙江待了好几年。回来的时候是什么心情？",
+      "label": {"is_life_story": true, "era_tags": ["知青年代", "文革时期"], "emotion_tone": "平淡", "missing": ["返城后的安置"], "note": "明确年份+转折点"}
+    },
+    {
+      "id": 15,
+      "split": "train",
+      "topic": "健康",
+      "user": "这两条腿一到阴天就发沉，走路费劲。",
+      "assistant": "阴天关节容易不舒服，您平时多注意保暖，别硬撑着走远路。",
+      "label": {"is_life_story": false, "note": "健康自述（属事实记忆，非生平故事）"}
+    },
+    {
+      "id": 16,
+      "split": "holdout",
+      "topic": "婚姻",
+      "user": "我跟他是在厂里认识的，同事介绍的，头一回见面他都不敢看我。",
+      "assistant": "那会儿的人见面都腼腆。您对他第一印象咋样呀？",
+      "label": {"is_life_story": true, "era_tags": [], "emotion_tone": "温暖", "missing": ["哪一年", "他的名字"], "note": "婚恋起点"}
+    },
+    {
+      "id": 17,
+      "split": "train",
+      "topic": "婚姻",
+      "user": "我们七八年结的婚，就在厂里食堂摆了两桌，亲戚朋友凑一块儿热闹热闹。",
+      "assistant": "食堂摆两桌，那时候就算很体面了。您还记得那天穿的什么吗？",
+      "label": {"is_life_story": true, "era_tags": ["改革开放初期"], "emotion_tone": "温暖", "missing": ["具体日子", "来了多少人"], "note": "明确年份+婚俗"}
+    },
+    {
+      "id": 18,
+      "split": "train",
+      "topic": "家庭",
+      "user": "八零年生的闺女，小芳，那会儿医院条件差，我在家坐的月子。",
+      "assistant": "八零年生闺女，一晃这么多年了。小芳小时候好带吗？",
+      "label": {"is_life_story": true, "era_tags": ["改革开放初期"], "emotion_tone": "温暖", "missing": ["具体月份"], "note": "下一代节点"}
+    },
+    {
+      "id": 19,
+      "split": "holdout",
+      "topic": "居住",
+      "user": "刚结婚住的筒子楼，一层楼共用一个水房，做饭都在楼道里。",
+      "assistant": "筒子楼那会儿家家都这样，谁家炒什么菜全楼都知道。邻居处得好吧？",
+      "label": {"is_life_story": true, "era_tags": [], "emotion_tone": "平淡", "missing": ["住了几年", "哪个厂区"], "note": "居住记忆"}
+    },
+    {
+      "id": 20,
+      "split": "train",
+      "topic": "物件",
+      "user": "攒了两年，又托人弄了张缝纫机票，才买上那台蝴蝶牌缝纫机。",
+      "assistant": "蝴蝶牌的，那时候可是大件。您用它给家里人做了不少衣裳吧？",
+      "label": {"is_life_story": true, "era_tags": ["票证年代"], "emotion_tone": "自豪", "missing": ["哪一年买的", "缝纫机的下落"], "note": "票证+物件"}
+    },
+    {
+      "id": 21,
+      "split": "train",
+      "topic": "电视",
+      "user": "电视里正演着戏呢，我看了会儿。",
+      "assistant": "看戏解闷挺好。演的是哪出呀？",
+      "label": {"is_life_story": false, "note": "当下日常"}
+    },
+    {
+      "id": 22,
+      "split": "train",
+      "topic": "纺织厂",
+      "user": "八几年我当上小组长了，管二十来号人，天天得盯着产量。",
+      "assistant": "管二十来号人可不轻松。当组长以后是不是更忙了？",
+      "label": {"is_life_story": true, "era_tags": ["改革开放初期"], "emotion_tone": "自豪", "missing": ["具体哪一年", "当了几年"], "note": "职业晋升"}
+    },
+    {
+      "id": 23,
+      "split": "holdout",
+      "topic": "文艺",
+      "user": "厂里搞文艺汇演，我上台唱过歌，唱的《洪湖水浪打浪》，底下一片掌声。",
+      "assistant": "还能上台唱，那嗓子肯定好。您那时候紧张不紧张呀？",
+      "label": {"is_life_story": true, "era_tags": [], "emotion_tone": "自豪", "missing": ["哪一年", "还唱过别的吗"], "note": "才艺+事件"}
+    },
+    {
+      "id": 24,
+      "split": "train",
+      "topic": "音乐",
+      "user": "后来偷偷听邓丽君的歌，拿个小录音机，怕人听见，把声音拧得小小的。",
+      "assistant": "那会儿听邓丽君还得偷偷听呀。您最爱听她哪一首？",
+      "label": {"is_life_story": true, "era_tags": ["改革开放初期"], "emotion_tone": "温暖", "missing": ["哪一年", "磁带后来还在吗"], "note": "时代细节"}
+    },
+    {
+      "id": 25,
+      "split": "train",
+      "topic": "孤独",
+      "user": "一个人在家待着，有点闷得慌。",
+      "assistant": "一个人待久了是容易闷。要不咱说说话，或者我给您放首歌听听？",
+      "label": {"is_life_story": false, "note": "一次性情绪"}
+    },
+    {
+      "id": 26,
+      "split": "train",
+      "topic": "元提问",
+      "user": "你是机器人不？会不会累呀？",
+      "assistant": "我是陪着您说话的，不会累。您想聊啥我都陪着。",
+      "label": {"is_life_story": false, "note": "对系统的元提问"}
+    },
+    {
+      "id": 27,
+      "split": "train",
+      "topic": "家庭",
+      "user": "小芳上学那阵儿，我天天送她，书包都是我一针一线缝的。",
+      "assistant": "书包都是您亲手缝的，那份心意小芳肯定记得。她学习好吗？",
+      "label": {"is_life_story": true, "era_tags": [], "emotion_tone": "温暖", "missing": ["哪一年上学", "缝的什么花色"], "note": "亲子细节"}
+    },
+    {
+      "id": 28,
+      "split": "train",
+      "topic": "邻里",
+      "user": "隔壁老张家今天给我送了把青菜。",
+      "assistant": "邻里之间互相照应，挺好的。您跟他们家处得惯吧？",
+      "label": {"is_life_story": false, "note": "当下社交"}
+    },
+    {
+      "id": 29,
+      "split": "holdout",
+      "topic": "下岗改制",
+      "user": "九十年代厂子就不行了，活越来越少，工资也拖。",
+      "assistant": "那几年好多厂子都难。你们当时心里是不是也发慌？",
+      "label": {"is_life_story": true, "era_tags": ["下岗改制"], "emotion_tone": "辛酸", "missing": ["哪一年开始", "后来怎么熬过来的"], "note": "时代转折"}
+    },
+    {
+      "id": 30,
+      "split": "train",
+      "topic": "下岗改制",
+      "user": "九六年我就下岗了，买断工龄，拿了万把块钱，那阵子觉都睡不着。",
+      "assistant": "突然没了手头这份活儿，心里肯定空落落的。那段日子真不容易。",
+      "label": {"is_life_story": true, "era_tags": ["下岗改制"], "emotion_tone": "创伤", "missing": ["买断的具体年份", "下岗后第一件事"], "note": "重大挫折，触发契约2 强制 private"}
+    },
+    {
+      "id": 31,
+      "split": "holdout",
+      "topic": "下岗改制",
+      "user": "下岗以后我摆过早点摊，三四点就得起来和面，冬天手冻得跟胡萝卜似的。",
+      "assistant": "三四点就起来和面，那真是硬扛过来的。摊子摆了多久呀？",
+      "label": {"is_life_story": true, "era_tags": ["下岗改制"], "emotion_tone": "辛酸", "missing": ["摆了几年", "还有人帮忙吗"], "note": "生计转型"}
+    },
+    {
+      "id": 32,
+      "split": "train",
+      "topic": "纺织厂",
+      "user": "后来厂里后勤缺人，又把我叫回去干到退休。",
+      "assistant": "又回去干到退休，也算有个着落。回去以后干的活儿累不累？",
+      "label": {"is_life_story": true, "era_tags": [], "emotion_tone": "平淡", "missing": ["哪一年回去", "具体干什么"], "note": "职业收尾"}
+    },
+    {
+      "id": 33,
+      "split": "holdout",
+      "topic": "退休",
+      "user": "零四年退休，办手续那天，我把工牌交上去，心里空了一下。",
+      "assistant": "干了这么多年，交工牌那一刻心里肯定不好受。退休那天您去哪儿了？",
+      "label": {"is_life_story": true, "era_tags": ["新世纪"], "emotion_tone": "辛酸", "missing": ["退休日期", "退休后第一天做什么"], "note": "人生节点"}
+    },
+    {
+      "id": 34,
+      "split": "train",
+      "topic": "健康",
+      "user": "昨晚上又没睡好，翻来覆去的。",
+      "assistant": "睡不好白天就没精神。您平时睡前会做点啥放松一下不？",
+      "label": {"is_life_story": false, "note": "健康自述"}
+    },
+    {
+      "id": 35,
+      "split": "train",
+      "topic": "家庭",
+      "user": "有点想小芳了，她这礼拜也没打电话来。",
+      "assistant": "想孩子是常情，她忙起来也顾不上。要不我陪您说说话？",
+      "label": {"is_life_story": false, "note": "当下情绪"}
+    },
+    {
+      "id": 36,
+      "split": "holdout",
+      "topic": "老伴",
+      "user": "他那几年身体就不行了，血压高，走两步就喘。",
+      "assistant": "照顾生病的家人最耗心神。那几年是您一个人照应着吧？",
+      "label": {"is_life_story": true, "era_tags": [], "emotion_tone": "辛酸", "missing": ["哪几年", "有没有住院"], "note": "照护经历"}
+    },
+    {
+      "id": 37,
+      "split": "train",
+      "topic": "老伴",
+      "user": "一八年的冬天他走的，走得挺急，我到现在还老梦见。",
+      "assistant": "那份想念不会淡的。您愿意说的时候我就听着，不想说咱就不说。",
+      "label": {"is_life_story": true, "era_tags": [], "emotion_tone": "创伤", "missing": ["具体月份", "之后怎么过来的"], "note": "重大丧亲，强制 private 且锁定；assistant 不追问"}
+    },
+    {
+      "id": 38,
+      "split": "train",
+      "topic": "功能请求",
+      "user": "你给我唱个歌呗。",
+      "assistant": "我唱的怕是不好听，不过可以给您放一首，您想听谁的？",
+      "label": {"is_life_story": false, "note": "功能请求"}
+    },
+    {
+      "id": 39,
+      "split": "train",
+      "topic": "社交",
+      "user": "前些日子老同事聚会，见着几个当年车间里的，都白发苍苍了。",
+      "assistant": "几十年没见，一见面肯定有说不完的话。你们还约着下次再聚吗？",
+      "label": {"is_life_story": true, "era_tags": [], "emotion_tone": "温暖", "missing": ["聚会在哪儿", "来了几个人"], "note": "社交+时代群体"}
+    },
+    {
+      "id": 40,
+      "split": "holdout",
+      "topic": "知青年代",
+      "user": "前年我回了一趟黑龙江，当年那个连队早没了，改成一片地了。",
+      "assistant": "几十年过去，地方都认不出来了。站那片地上，您心里是什么滋味？",
+      "label": {"is_life_story": true, "era_tags": ["知青年代"], "emotion_tone": "辛酸", "missing": ["哪一年回去的", "跟谁一起去的"], "note": "重返故地"}
+    },
+    {
+      "id": 41,
+      "split": "holdout",
+      "topic": "物件",
+      "user": "我抽屉里有一沓老照片，黑白的，边角都卷了。",
+      "assistant": "老照片最珍贵了。有空的话可以一张一张讲讲，我帮您记着。",
+      "label": {"is_life_story": true, "era_tags": [], "emotion_tone": "温暖", "missing": ["照片都是什么时期", "有没有合影"], "note": "物件引出记忆"}
+    },
+    {
+      "id": 42,
+      "split": "train",
+      "topic": "原生家庭",
+      "user": "我妈做的手擀面，擀得薄薄的，下锅一滚就熟，那味道再没吃过。",
+      "assistant": "妈妈做的味道，谁都替不了。她那时候做饭还有啥拿手的？",
+      "label": {"is_life_story": true, "era_tags": [], "emotion_tone": "温暖", "missing": ["母亲其他拿手菜", "母亲哪年过世的"], "note": "原生家庭"}
+    },
+    {
+      "id": 43,
+      "split": "train",
+      "topic": "日常询问",
+      "user": "今天几号啦？我记性不行了。",
+      "assistant": "我这边看今天是十月十五号。您想记什么事，我帮您记着点。",
+      "label": {"is_life_story": false, "note": "日常询问"}
+    },
+    {
+      "id": 44,
+      "split": "train",
+      "topic": "纺织厂",
+      "user": "头一个月工资，我给我妈扯了块布，剩下的全交家里了。",
+      "assistant": "挣第一份钱就想着家里，您娘肯定高兴。她当时说什么了吗？",
+      "label": {"is_life_story": true, "era_tags": [], "emotion_tone": "温暖", "missing": ["哪一年", "扯的什么布"], "note": "家庭责任"}
+    },
+    {
+      "id": 45,
+      "split": "train",
+      "topic": "结束语",
+      "user": "有点累了，不想说了。",
+      "assistant": "那您歇着，我在这儿呢。想聊了随时叫我。",
+      "label": {"is_life_story": false, "note": "结束语"}
+    },
+    {
+      "id": 46,
+      "split": "holdout",
+      "topic": "情绪",
+      "user": "还是年轻那会儿好啊，人也有劲儿，日子也有意思。",
+      "assistant": "年轻那会儿精力足，什么都愿意去试。您说有意思，是指什么有意思呀？",
+      "label": {"is_life_story": false, "note": "硬负例：纯感慨，无任何具体事实"}
+    },
+    {
+      "id": 47,
+      "split": "train",
+      "topic": "生活技能",
+      "user": "我学骑自行车还是在大院里，摔了好几回，膝盖磕得青一块紫一块。",
+      "assistant": "摔了那么多回才学会，也是够倔的。最后是怎么学会的呀？",
+      "label": {"is_life_story": true, "era_tags": [], "emotion_tone": "平淡", "missing": ["哪一年", "骑的谁的车"], "note": "生活技能"}
+    },
+    {
+      "id": 48,
+      "split": "train",
+      "topic": "当下困扰",
+      "user": "这手机我老弄不明白，一不小心就点错了。",
+      "assistant": "手机功能多，弄错也正常。您想用哪个功能，我一步步教您。",
+      "label": {"is_life_story": false, "note": "当下困扰"}
+    },
+    {
+      "id": 49,
+      "split": "train",
+      "topic": "年俗",
+      "user": "过大年那会儿，一家人包饺子，屋外头放炮，我们守着火盆熬到天亮。",
+      "assistant": "守着火盆熬到天亮，那才叫过年。您家饺子是什么馅的呀？",
+      "label": {"is_life_story": true, "era_tags": [], "emotion_tone": "温暖", "missing": ["哪一年过年", "还有什么讲究"], "note": "年俗记忆"}
+    },
+    {
+      "id": 50,
+      "split": "holdout",
+      "topic": "情绪",
+      "user": "昨天晚上做梦，梦见一个地方，说不清是哪儿。",
+      "assistant": "有些梦醒来就散了。要是哪天想起来，咱再慢慢说。",
+      "label": {"is_life_story": false, "note": "硬负例：模糊无实质内容，不应判为生平故事"}
+    },
+    {
+      "id": 51,
+      "split": "train",
+      "topic": "童年",
+      "user": "我小时候在乡下，村口有条河，夏天我们一帮孩子就在里头摸鱼。",
+      "assistant": "摸鱼的夏天听着就有意思。后来您多大离开那儿的？",
+      "label": {"is_life_story": true, "era_tags": [], "emotion_tone": "温暖", "missing": ["老家的村子名", "母亲姊妹几个"], "note": "童年记忆"}
+    },
+    {
+      "id": 52,
+      "split": "holdout",
+      "topic": "电视",
+      "user": "电视里天天放那些打打闹闹的，我也看不懂。",
+      "assistant": "有些节目是闹腾。您以前爱看什么，我可以帮您找找。",
+      "label": {"is_life_story": false, "note": "当下日常"}
+    },
+    {
+      "id": 53,
+      "split": "train",
+      "topic": "家庭",
+      "user": "小芳后来考上大学，分到城里工作，嫁了个实在人。",
+      "assistant": "小芳有出息，您在背后肯定没少操心。她工作忙不忙呀？",
+      "label": {"is_life_story": true, "era_tags": [], "emotion_tone": "自豪", "missing": ["哪一年考的", "女婿做什么的"], "note": "下一代成就"}
+    },
+    {
+      "id": 54,
+      "split": "train",
+      "topic": "健康",
+      "user": "我早上那降压药还没吃呢。",
+      "assistant": "那您记得按时吃，别断了。要不要我提醒您一下？",
+      "label": {"is_life_story": false, "note": "健康管理"}
+    },
+    {
+      "id": 55,
+      "split": "holdout",
+      "topic": "情绪",
+      "user": "今天没啥事，一天就这么过去了。",
+      "assistant": "闲下来是这样。要不咱们聊点您爱说的，或者听段老歌？",
+      "label": {"is_life_story": false, "note": "一次性情绪"}
+    },
+    {
+      "id": 56,
+      "split": "train",
+      "topic": "孙辈",
+      "user": "外孙女出生那年，我去城里伺候月子，头一回见着这么小的娃娃。",
+      "assistant": "头一回抱那么小的娃娃，手都不知道往哪儿放吧？外孙女现在多大了？",
+      "label": {"is_life_story": true, "era_tags": [], "emotion_tone": "温暖", "missing": ["哪一年出生", "外孙女小名"], "note": "隔代节点"}
+    },
+    {
+      "id": 57,
+      "split": "holdout",
+      "topic": "老伴",
+      "user": "他那人没别的爱好，就爱听戏，一开收音机就是半天。",
+      "assistant": "爱听戏的人听得入迷。他最爱听哪一出呀？",
+      "label": {"is_life_story": true, "era_tags": [], "emotion_tone": "温暖", "missing": ["爱听哪一出", "哪年的事"], "note": "配偶细节"}
+    },
+    {
+      "id": 58,
+      "split": "train",
+      "topic": "功能请求",
+      "user": "你会讲笑话不？给我讲一个。",
+      "assistant": "那我讲一个。有个老头去买鞋，试了半天说：这鞋哪儿都好，就是有点挤脚。您听出乐子在哪儿没？",
+      "label": {"is_life_story": false, "note": "功能请求"}
+    },
+    {
+      "id": 59,
+      "split": "train",
+      "topic": "音乐",
+      "user": "邓丽君走的那年，我心里还挺难受的，她的歌我到现在都会哼。",
+      "assistant": "她的歌陪着那么多人。您一哼起来，那些年是不是也跟着回来了？",
+      "label": {"is_life_story": true, "era_tags": [], "emotion_tone": "温暖", "missing": ["哪一年", "最喜欢的一首"], "note": "文化记忆"}
+    },
+    {
+      "id": 60,
+      "split": "holdout",
+      "topic": "天气",
+      "user": "这两天凉下来了，我得多加件衣裳。",
+      "assistant": "天凉加衣裳是对的，早晚温差大，别着凉。",
+      "label": {"is_life_story": false, "note": "当下日常"}
+    }
+  ]
+}

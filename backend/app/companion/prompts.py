@@ -137,6 +137,29 @@ def _knowledge_block(ctx) -> str:
     )
 
 
+def _elicitation_block(ctx) -> str:
+    """M4：本轮允许顺带问一个关于往事的问题。
+
+    `hint` 是**追问方向**，不是要念的稿子——必须让主模型自己化成口语问句，
+    否则每次都是同一句模板，老人听得出来是机器。这里把边界写死：
+    只问这一个、不说"我记录到"、不逼问、老人不想聊就立刻放下。
+    """
+    info = getattr(ctx, "elicitation", None)
+    if not info:
+        return ""
+    hint = (info.get("hint") or "").strip()
+    if not hint:
+        return ""
+    return "\n".join([
+        "【本轮可以顺带问一句往事】",
+        f"- 想了解的方向：{hint}",
+        "- 用您自己的话把它化成一句家常问句，不要照搬上面的字面措辞，"
+        "也不要提\"记录\"\"回忆录\"\"档案\"这类词。",
+        "- 只问这一个，问完就停，不要再接第二个问题。",
+        "- 老人要是说不想提、或者把话头岔开了，顺着他就好，别追问。",
+    ])
+
+
 def build_messages(ctx, user_message: str):
     """把 (system+画像+长期记忆+情境分析+策略+安全指令, 短期历史, 当前消息) 拼成 messages。"""
     system = COMPANION_SYSTEM_PROMPT
@@ -161,6 +184,10 @@ def build_messages(ctx, user_message: str):
     policy_block = _policy_block(ctx)
     if policy_block:
         system += "\n\n【陪伴策略】\n" + policy_block
+
+    elicit_block = _elicitation_block(ctx)
+    if elicit_block:
+        system += "\n\n" + elicit_block
 
     system += _safety_block(ctx)
 

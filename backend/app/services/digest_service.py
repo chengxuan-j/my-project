@@ -2,13 +2,18 @@
 
 供 scheduler/jobs/daily_digest.py 使用：
 - build_stats：把当天 Conversation 列表聚合成统计（轮数/情绪分布/话题/时段）
+- memoir_line：把回忆录增量（今天/本周新增几段）拼成一句话
 - summarize：调快模型（qwen-turbo）写一段给家属看的温馨摘要；未配置 Key 或调用失败时
   降级为纯统计文本，保证日报一定能生成
+
+回忆录口径（M6）：只统计**家属看得见**的（archived + visibility ∈ family/public），
+计数在 job 里用 StoryRepo 算好传进来——本模块不碰数据库，纯拼文案，
+这样"看一眼文案就知道会说给家属什么"。
 """
 import logging
 from collections import Counter
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from app.db.models import Conversation
 
@@ -73,25 +78,61 @@ def build_stats(convs: List[Conversation]) -> Dict[str, Any]:
     }
 
 
-def _fallback_summary(stats: Dict[str, Any]) -> str:
-    """无 LLM 时的降级摘要：纯统计口播。"""
+def memoir_sentences(memoir: Optional[Dict[str, Any]]) -> List[str]:
+    """把回忆录增量拼成给家属看的口语短句（可能为空）。"""
+    if not memoir:
+        return []
+    today = int(memoir.get("today") or 0)
+    week = int(memoir.get("week") or 0)
+    total = int(memoir.get("total") or 0)
+    out: List[str] = []
+    if today == 1:
+        out.append("今天留下了一段新回忆")
+    elif today > 1:
+        out.append(f"今天留下了 {today} 段新回忆")
+    elif week > 0:
+        out.append(f"这周已经攒下 {week} 段回忆")
+    if total > 0:
+        out.append(f"回忆录里一共 {total} 段")
+    return out
+
+
+def _fallback_summary(
+    stats: Dict[str, Any], memoir: Optional[Dict[str, Any]] = None
+) -> str:
+    """无 LLM 时的降级摘要：纯统计口播。
+
+    `rounds == 0`（今天只留了回忆、没怎么聊天）时不提"聊了 0 轮"——
+    那读起来像在报故障，不是报平安。
+    """
     parts: List[str] = []
-    parts.append(f"今天和陪伴助手聊了 {stats['rounds']} 轮")
-    if stats.get("main_emotion_label"):
-        parts.append(f"整体心情{stats['main_emotion_label']}")
-    if stats.get("topics"):
-        topics = "、".join(t["topic"] for t in stats["topics"][:3])
-        parts.append(f"主要聊了{topics}")
-    if stats.get("time_range"):
-        parts.append(f"活跃时段在{stats['time_range']}")
+    rounds = int(stats.get("rounds") or 0)
+    if rounds:
+        parts.append(f"今天和陪伴助手聊了 {rounds} 轮")
+        if stats.get("main_emotion_label"):
+            parts.append(f"整体心情{stats['main_emotion_label']}")
+        if stats.get("topics"):
+            topics = "、".join(t["topic"] for t in stats["topics"][:3])
+            parts.append(f"主要聊了{topics}")
+        if stats.get("time_range"):
+            parts.append(f"活跃时段在{stats['time_range']}")
+    parts.extend(memoir_sentences(memoir))
+    if not parts:
+        return ""
     return "，".join(parts) + "。"
 
 
-async def summarize(elderly_name: str, convs: List[Conversation]) -> str:
+async def summarize(
+    elderly_name: str,
+    convs: List[Conversation],
+    memoir: Optional[Dict[str, Any]] = None,
+) -> str:
     """调快模型生成给家属的温馨摘要；失败时降级为统计文本。"""
     stats = build_stats(convs)
+
     if not convs:
-        return ""
+        # 今天只留了回忆、没聊天：不调模型（没什么可总结的），直接给回忆那句
+        return _fallback_summary(stats, memoir)
 
     # 组装对话文本（控制长度）
     lines: List[str] = []
@@ -108,9 +149,18 @@ async def summarize(elderly_name: str, convs: List[Conversation]) -> str:
         "1. 100 字以内，语气温暖、像家人之间的报平安；\n"
         "2. 说清老人今天心情如何、聊了什么话题；\n"
         "3. 如有值得关注的细节（身体不适、情绪低落、反复提起某件事），温和提醒家属；\n"
-        "4. 只输出摘要正文，不要标题、不要解释。\n\n"
-        f"聊天记录：\n{dialogue}"
+        "4. 只输出摘要正文，不要标题、不要解释。\n"
     )
+    extra = memoir_sentences(memoir)
+    if extra:
+        joined = "，".join(extra)
+        prompt += (
+            "5. 老人今天在整理回忆，请自然地提一句（如「"
+            + joined
+            + "」），不要用「档案」「录入」「数据」这类词，"
+            "也不要显得像在盘点。\n"
+        )
+    prompt += f"\n聊天记录：\n{dialogue}"
 
     try:
         from app.llm.qwen_client import QwenClient
@@ -118,7 +168,7 @@ async def summarize(elderly_name: str, convs: List[Conversation]) -> str:
         client = QwenClient()
         if not client.is_configured:
             logger.info("未配置 QWEN_API_KEY，日报摘要使用统计降级")
-            return _fallback_summary(stats)
+            return _fallback_summary(stats, memoir)
         # 注意：用主模型而非 analysis_model——分析模型可能是 kimi-k3 这类
         # 推理模型，token 会全部耗在思维链上导致 content 为空；
         # 也不传 temperature（kimi-k3 等模型不接受该参数）。
@@ -133,16 +183,30 @@ async def summarize(elderly_name: str, convs: List[Conversation]) -> str:
         logger.warning("日报摘要为空，使用统计降级")
     except Exception as e:  # LLM 故障绝不阻断日报推送
         logger.warning("日报摘要生成失败，使用统计降级: %s", e)
-    return _fallback_summary(stats)
+    return _fallback_summary(stats, memoir)
 
 
 async def build_digest_payload(
-    elderly_name: str, convs: List[Conversation], date_str: str
+    elderly_name: str,
+    convs: List[Conversation],
+    date_str: str,
+    memoir: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """组装日报 payload（存进 FamilyMessage.content 的 JSON）。"""
+    """组装日报 payload（存进 FamilyMessage.content 的 JSON）。
+
+    `memoir` 形如 `{"today": 1, "week": 3, "total": 12}`，由 job 端算好
+    （只含家属可见的条目）。为 None / 全 0 时不写这个键，前端自然不显示。
+    """
     stats = build_stats(convs)
-    summary = await summarize(elderly_name, convs)
-    return {"date": date_str, "summary": summary, "stats": stats}
+    summary = await summarize(elderly_name, convs, memoir=memoir)
+    payload: Dict[str, Any] = {"date": date_str, "summary": summary, "stats": stats}
+    if memoir and any(int(memoir.get(k) or 0) for k in ("today", "week", "total")):
+        payload["memoir"] = {
+            "today": int(memoir.get("today") or 0),
+            "week": int(memoir.get("week") or 0),
+            "total": int(memoir.get("total") or 0),
+        }
+    return payload
 
 
 def is_digest_content(content: str) -> bool:

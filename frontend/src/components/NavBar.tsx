@@ -8,6 +8,7 @@ import { useSettingsStore } from '@/stores/settings';
 
 const NAV_ITEMS_ELDERLY = [
   { href: '/', label: '💬 聊天' },
+  { href: '/memoir', label: '📖 回忆录' },
   { href: '/profile', label: '👤 我的' },
   { href: '/account', label: '⚙ 账号' },
 ];

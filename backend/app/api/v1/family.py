@@ -1,18 +1,40 @@
-"""家属看板：绑定老人 + 查看老人情绪历史 + 查看老人记忆 + 告警管理 + 家人留言互动。"""
+"""家属看板：绑定老人 + 查看老人情绪历史 + 查看老人记忆 + 回忆录（只读）+ 告警管理 + 家人留言互动。
+
+回忆录部分（M6）刻意只有三种写操作：给可见往事**补照片**、撤回自己补的照片、
+发留言。**没有**确认留档、没有改可见性、没有创建短片——那三样是老人专属
+（契约1/2）。照片读接口在 memoir.py（双方共读，那边做鉴权判定）。
+"""
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from app.core.dependencies import get_current_account, require_elderly, require_family
 from app.core.events import bus
 from app.db.base import get_db
 from app.db.models import Account, FamilyMessage
+from app.memoir import media_service
+from app.memoir.presenter import compilation_to_dict, media_to_dict
+from app.memoir.story_service import (
+    attach_photo,
+    build_timeline_payload,
+    detach_photo,
+    filter_package_for_family,
+    load_family_story,
+    visible_story_ids,
+)
 from app.repositories.account_repo import AccountRepo
 from app.repositories.alert_repo import AlertRepo
 from app.repositories.family_message_repo import FamilyMessageRepo
 from app.repositories.profile_repo import ConversationRepo, FamilyRepo, MemoryRepo
-from app.schemas import AlertResponse, BindElderlyRequest
+from app.repositories.story_repo import CompilationRepo, StoryMediaRepo, StoryRepo
+from app.schemas import (
+    AlertResponse,
+    BindElderlyRequest,
+    CompilationItem,
+    MemoirTimeline,
+    StoryMediaItem,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/family", tags=["family"])
@@ -119,6 +141,150 @@ async def elderly_memories(
         }
         for r in rows
     ]}
+
+
+@router.get("/elderly/{elderly_id}/memoir", response_model=MemoirTimeline)
+async def elderly_memoir(
+    elderly_id: str,
+    account: Account = Depends(require_family),
+    session: AsyncSession = Depends(get_db),
+):
+    """家属查看已绑定老人的回忆录（时代轴）。
+
+    契约1/2 的双重保障：
+    - 家属**不能**确认/弃用；这里只有读，没有写路径；
+    - 服务层只返回 `archived` 且 `visibility ∈ (family, public)` 的条目，
+      创伤类 private 故事根本不会出现在响应里（不是前端隐藏）。
+    """
+    repo = FamilyRepo(session)
+    if elderly_id not in await repo.list_elderly(account.user_id):
+        raise HTTPException(status_code=403, detail="未绑定该老人")
+    return await build_timeline_payload(session, elderly_id, family_view=True)
+
+
+@router.get("/elderly/{elderly_id}/memoir/compilations",
+            response_model=list[CompilationItem])
+async def elderly_compilations(
+    elderly_id: str,
+    account: Account = Depends(require_family),
+    session: AsyncSession = Depends(get_db),
+):
+    """家属列出老人已经排好的短片提示词包。
+
+    契约1：这里**只有读**，没有创建/删除。家属想自己排一条，请让老人在
+    老人端操作——编排等于替老人决定"哪些事可以被讲出来"。
+    契约2：每条的镜头都按**当下**可见性再过滤一遍；整片被收回则整条不返回
+    （对家属等同于不存在），而不是返回一个空壳。
+    """
+    if elderly_id not in await FamilyRepo(session).list_elderly(account.user_id):
+        raise HTTPException(status_code=403, detail="未绑定该老人")
+
+    visible = await visible_story_ids(session, elderly_id)
+    items: list[CompilationItem] = []
+    for comp in await CompilationRepo(session).list_for_user(elderly_id):
+        package = filter_package_for_family(comp.prompt_package, visible)
+        if comp.prompt_package and package is None:
+            continue
+        items.append(compilation_to_dict(comp, package=package))
+    return items
+
+
+@router.get("/elderly/{elderly_id}/memoir/compilations/{comp_id}",
+            response_model=CompilationItem)
+async def elderly_compilation(
+    elderly_id: str,
+    comp_id: int,
+    account: Account = Depends(require_family),
+    session: AsyncSession = Depends(get_db),
+):
+    """家属读取已生成的提示词包（供复制到外部视频工具）。
+
+    契约1：家属只能**读**，本路由下没有任何创建/删除的写路径。
+    契约2：提示词包是编排当时的快照，快照不会自动跟随可见性变化，
+    所以在返回前按**当下**的可见故事集合再过滤一次每段镜头——
+    老人后来说"这段别给人看"了，家属就不该还能看到那段旁白。
+    """
+    if elderly_id not in await FamilyRepo(session).list_elderly(account.user_id):
+        raise HTTPException(status_code=403, detail="未绑定该老人")
+
+    comp = await CompilationRepo(session).get(comp_id, elderly_id)
+    if comp is None:
+        raise HTTPException(status_code=404, detail="找不到这段短片")
+
+    visible = {s.id for s in await StoryRepo(session).list_visible_for_family(elderly_id)}
+    package = filter_package_for_family(comp.prompt_package, visible)
+    if comp.prompt_package and package is None:
+        # 整片都被老人收回可见性了 —— 对家属等同于不存在
+        raise HTTPException(status_code=404, detail="找不到这段短片")
+    return compilation_to_dict(comp, package=package)
+
+
+# ---------- 家属端回忆照片（M6） ----------
+#
+# 家属能做的只有两件：给**看得见的**往事补照片、删掉自己补的那张。
+# 不能改文字、不能改可见性、不能替老人确认留档（契约1/2/5）。
+
+@router.post("/elderly/{elderly_id}/memoir/stories/{story_id}/media",
+             response_model=StoryMediaItem)
+async def family_upload_story_photo(
+    elderly_id: str,
+    story_id: int,
+    file: UploadFile = File(...),
+    caption: str = Form(""),
+    account: Account = Depends(require_family),
+    session: AsyncSession = Depends(get_db),
+):
+    """家属给老人一条**已留档且家属可见**的往事补一张照片。
+
+    三道门：已绑定 → 故事存在 → 故事当下 archived 且 visibility ∈ (family, public)。
+    不满足一律 404（不告诉家属"有这条但你看不到"）。
+    """
+    if elderly_id not in await FamilyRepo(session).list_elderly(account.user_id):
+        raise HTTPException(status_code=403, detail="未绑定该老人")
+
+    story = await load_family_story(session, elderly_id, story_id)
+    if story is None:
+        raise HTTPException(status_code=404, detail="找不到这条回忆")
+
+    data = await file.read()
+    try:
+        media = await attach_photo(
+            session, story,
+            uploader_user_id=account.user_id,
+            data=data, content_type=file.content_type or "", caption=caption,
+        )
+    except media_service.MediaError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    await session.commit()
+    return media_to_dict(media, elderly_id)
+
+
+@router.delete("/elderly/{elderly_id}/memoir/media/{media_id}")
+async def family_delete_story_photo(
+    elderly_id: str,
+    media_id: int,
+    account: Account = Depends(require_family),
+    session: AsyncSession = Depends(get_db),
+):
+    """家属撤回**自己上传的**照片。
+
+    这里刻意**不**要求故事当前可见：删是让信息变少，不是变多；
+    让上传者能收回自己放进去的东西，比"老人改成 private 之后家属连删都删不掉"
+    更符合隐私预期。
+    """
+    if elderly_id not in await FamilyRepo(session).list_elderly(account.user_id):
+        raise HTTPException(status_code=403, detail="未绑定该老人")
+
+    media = await StoryMediaRepo(session).get(media_id)
+    if media is None or media.uploaded_by != account.user_id:
+        raise HTTPException(status_code=404, detail="找不到这张照片")
+    story = await StoryRepo(session).get(media.story_id, elderly_id)
+    if story is None:
+        raise HTTPException(status_code=404, detail="找不到这张照片")
+
+    await detach_photo(session, media)
+    await session.commit()
+    return {"deleted": True, "id": media_id}
 
 
 # ---------- 告警 ----------

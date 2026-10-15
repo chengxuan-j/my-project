@@ -33,6 +33,7 @@ def register_jobs() -> None:
     from app.scheduler.jobs.memory_consolidation import memory_consolidation_job
     from app.scheduler.jobs.emotion_alert import emotion_alert_check_job
     from app.scheduler.jobs.daily_digest import daily_digest_job
+    from app.scheduler.jobs.story_gap_scan import story_gap_scan_job
 
     scheduler = get_scheduler()
     settings = get_settings()
@@ -92,6 +93,17 @@ def register_jobs() -> None:
             CronTrigger(hour=settings.digest_hour, minute=settings.digest_minute),
             id="daily_digest",
             name="每日陪伴日报",
+            replace_existing=True,
+        )
+
+    # 回忆录缺口夜间扫描（M4；MEMOIR_ENABLED 未开时任务本身会自我短路）
+    if settings.memoir_enabled:
+        scheduler.add_job(
+            story_gap_scan_job,
+            CronTrigger(hour=settings.memoir_gap_scan_hour,
+                        minute=settings.memoir_gap_scan_minute),
+            id="story_gap_scan",
+            name="回忆录缺口扫描",
             replace_existing=True,
         )
 

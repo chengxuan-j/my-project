@@ -319,3 +319,136 @@ class FamilyMessage(Base):
         Index("idx_famsg_elderly_time", "elderly_user_id", "id"),
         Index("idx_famsg_family", "family_user_id"),
     )
+
+
+# ---------------------------------------------------------------------------
+# 回忆录：生平故事 / 缺口追问 / 附件 / 短片编排
+#
+# 六条契约在表结构上的体现：
+# - 契约1 老人本人确认：status 的 archived 只能由老人端接口触发（见 api/v1/memoir.py）
+# - 契约2 创伤强制 private：visibility_locked=True 时仓储层拒绝改 visibility
+# - 契约5 不纠正记忆偏差：raw_dialogue 只追加，任何路径都不 UPDATE 该列
+# - 契约6 不调视频 API：video_url 预留恒为 None，状态止于 prompt_ready
+# ---------------------------------------------------------------------------
+
+class LifeStory(Base):
+    """一条生平故事（回忆录条目）。
+
+    status 流转：draft（信息太少，不打扰老人）→ pending_confirm（够格给老人确认）
+    → archived（老人确认留档）/ discarded（老人弃用，可恢复）。
+    """
+
+    __tablename__ = "life_stories"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    elderly_user_id: Mapped[str] = mapped_column(String(64), index=True)
+    title: Mapped[str] = mapped_column(String(128), default="")
+    summary: Mapped[str] = mapped_column(Text, default="")
+    # 原始对话片段，只增不改（契约5）。元素形如 {"role": "user", "content": "..."}
+    raw_dialogue: Mapped[Optional[List[dict]]] = mapped_column(JSON, nullable=True)
+
+    time_type: Mapped[str] = mapped_column(String(16), default="relative")
+    time_value: Mapped[str] = mapped_column(String(64), default="")
+    time_confidence: Mapped[float] = mapped_column(Float, default=0.0)
+    time_inferred: Mapped[bool] = mapped_column(Boolean, default=False)  # 由画像推算而来
+
+    era_tags: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+    place: Mapped[str] = mapped_column(String(64), default="")
+    people: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+    emotion_tone: Mapped[str] = mapped_column(String(16), default="平淡")
+    completeness: Mapped[float] = mapped_column(Float, default=0.0)
+
+    status: Mapped[str] = mapped_column(String(20), default="draft", index=True)
+    visibility: Mapped[str] = mapped_column(String(16), default="family")   # 契约2 默认 family
+    visibility_locked: Mapped[bool] = mapped_column(Boolean, default=False)
+    avoid_flag: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    source_msg_ids: Mapped[Optional[List[int]]] = mapped_column(JSON, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        Index("ix_life_stories_user_status", "elderly_user_id", "status"),
+        Index("ix_life_stories_user_eras", "elderly_user_id", "era_tags"),
+    )
+
+
+class StoryElicitationQueue(Base):
+    """缺口追问队列：由提取结果里的 missing 推导，供 M4 挑时机自然带出。"""
+
+    __tablename__ = "story_elicitation_queue"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    elderly_user_id: Mapped[str] = mapped_column(String(64), index=True)
+    story_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("life_stories.id", ondelete="CASCADE"), index=True
+    )
+    question: Mapped[str] = mapped_column(String(200), default="")
+    gap_type: Mapped[str] = mapped_column(String(20), default="missing_detail")
+    priority: Mapped[float] = mapped_column(Float, default=0.5)
+    status: Mapped[str] = mapped_column(String(16), default="pending")  # pending/asked/answered/abandoned
+    ask_count: Mapped[int] = mapped_column(Integer, default=0)
+    cooldown_until: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    asked_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+
+    __table_args__ = (
+        Index("ix_story_queue_user_status", "elderly_user_id", "status", "cooldown_until"),
+    )
+
+
+class StoryMedia(Base):
+    """回忆录附件：家属或老人上传的照片/音频/视频（当前只做照片）。"""
+
+    __tablename__ = "story_media"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    story_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("life_stories.id", ondelete="CASCADE"), index=True
+    )
+    type: Mapped[str] = mapped_column(String(10), default="photo")  # photo/audio/video
+    url: Mapped[str] = mapped_column(String(500), default="")
+    caption: Mapped[str] = mapped_column(String(200), default="")
+    uploaded_by: Mapped[str] = mapped_column(String(64), default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class StoryCompilation(Base):
+    """短片编排结果：只产出结构化提示词包 + 故事板，不生成任何画面（契约6）。
+
+    status 当前只到 prompt_ready；rendering/done/failed 为将来接入视频 API 预留，
+    video_url 同期限留且恒为 None。
+    """
+
+    __tablename__ = "story_compilations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    elderly_user_id: Mapped[str] = mapped_column(String(64), index=True)
+    title: Mapped[str] = mapped_column(String(128), default="")
+    story_ids: Mapped[Optional[List[int]]] = mapped_column(JSON, nullable=True)
+    perspective: Mapped[str] = mapped_column(String(16), default="first_person")
+    status: Mapped[str] = mapped_column(String(16), default="queued", index=True)
+    prompt_package: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    prompt_model: Mapped[str] = mapped_column(String(64), default="")
+    video_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)  # 预留，恒 None
+    created_by: Mapped[str] = mapped_column(String(64), default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True,
+    )
+
+    __table_args__ = (
+        Index("ix_story_compilations_user", "elderly_user_id", "created_at"),
+    )

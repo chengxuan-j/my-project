@@ -6,12 +6,19 @@ venv/
 backend/storage/*.db
 backend/storage/*.db-wal
 backend/storage/*.db-shm
+# 回忆照片落盘目录：库里只存相对路径，照片本身是**用户私人内容**，绝不入库。
+# 注意上面的 backend/storage/*.db 只匹配文件，匹配不到这个子目录，必须单独写。
+backend/storage/memoir_media/
 .pytest_cache/
 
 # 运行日志与产物
 *.log
 *.err
 tests_out.txt
+# 编辑器/手工备份（如 start.bat.bak）——备份不该进版本库，历史里有就够
+*.bak
+# 回忆录 M0 提取质量报告（每次跑脚本重生成，不入库）
+backend/data/story_probe_report.json
 
 # 前端
 node_modules/

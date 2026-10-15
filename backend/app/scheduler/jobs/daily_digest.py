@@ -1,12 +1,16 @@
 """每日陪伴日报推送任务（默认每天 20:30，Asia/Shanghai）。
 
 流程：
-1. 找出今天有过聊天的老人；
-2. 汇总当天对话 → 统计 + AI 摘要（digest_service）；
+1. 找出今天「有动静」的老人——聊过天，**或**今天留档了新的回忆（M6）；
+2. 汇总当天对话 → 统计 + AI 摘要（digest_service），并算上回忆录增量；
 3. 给每位绑定家属写一条 FamilyMessage（category=digest，sender_role=elderly），
    家属打开看板即可看到「今日陪伴日报」；
 4. 经 SSE 事件总线实时通知在线家属；
 5. 同一老人同一天只推一次（重复执行安全）。
+
+回忆录口径（M6）：只数**家属看得见**的（archived + visibility ∈ family/public）。
+创伤类 private 故事不进计数，也不该以"今天新增 1 段"的方式被家属感知到——
+那等于用数字泄了内容有没有（契约2）。
 
 时区说明：库中 created_at 以本地时间（naive）存储（实测 CURRENT_TIMESTAMP 为 UTC
 但应用写入路径用的是本地时间），因此按本地日期边界取「今天」与数据口径一致。
@@ -19,9 +23,10 @@ from sqlalchemy import distinct, select
 
 from app.core.events import bus
 from app.db.base import get_session_factory
-from app.db.models import Conversation, ElderlyProfile, FamilyMessage
+from app.db.models import Conversation, ElderlyProfile, FamilyMessage, LifeStory
 from app.repositories.family_message_repo import FamilyMessageRepo
 from app.repositories.profile_repo import FamilyRepo
+from app.repositories.story_repo import StoryRepo
 from app.services.digest_service import build_digest_payload
 
 logger = logging.getLogger(__name__)
@@ -36,12 +41,40 @@ def _today_range() -> tuple[datetime, datetime]:
     return start, start + timedelta(days=1)
 
 
+def _week_start(day_start: datetime) -> datetime:
+    """本周一 00:00（本地口径）。日报里"这周"用周一起算，比"近 7 天"更符合直觉。"""
+    return day_start - timedelta(days=day_start.weekday())
+
+
 async def _list_today_active_elderly(session, day_start: datetime, day_end: datetime) -> list[str]:
     stmt = (
         select(distinct(Conversation.user_id))
         .where(Conversation.created_at >= day_start, Conversation.created_at < day_end)
     )
     return list((await session.execute(stmt)).scalars().all())
+
+
+async def _list_today_archived_elderly(session, day_start: datetime) -> list[str]:
+    """今天留档过回忆的老人（按 `updated_at` 判，`set_status` 落档时会刷新）。"""
+    stmt = (
+        select(distinct(LifeStory.elderly_user_id))
+        .where(
+            LifeStory.status == "archived",
+            LifeStory.updated_at.is_not(None),
+            LifeStory.updated_at >= day_start,
+        )
+    )
+    return list((await session.execute(stmt)).scalars().all())
+
+
+async def _memoir_counts(session, elderly_user_id: str, day_start: datetime) -> dict[str, int]:
+    """回忆录增量（只含家属可见的条目，契约2）。"""
+    repo = StoryRepo(session)
+    return {
+        "today": await repo.count_family_visible(elderly_user_id, since=day_start),
+        "week": await repo.count_family_visible(elderly_user_id, since=_week_start(day_start)),
+        "total": await repo.count_family_visible(elderly_user_id),
+    }
 
 
 async def _has_digest_today(session, elderly_user_id: str, day_start: datetime) -> bool:
@@ -66,9 +99,13 @@ async def daily_digest_job() -> None:
     date_str = day_start.strftime("%Y-%m-%d")
 
     async with get_session_factory()() as session:
-        elderly_ids = await _list_today_active_elderly(session, day_start, day_end)
+        # 有动静 = 聊过天 ∪ 今天留档了回忆。合并去重后再逐个处理，
+        # 这样"今天没怎么聊天但认真讲了一段往事"的日子也有日报。
+        active = await _list_today_active_elderly(session, day_start, day_end)
+        archived = await _list_today_archived_elderly(session, day_start)
+        elderly_ids = list(dict.fromkeys(active + archived))
         if not elderly_ids:
-            logger.info("今天没有聊天记录，跳过日报生成")
+            logger.info("今天没有聊天记录也没有新回忆，跳过日报生成")
             return
 
         pushed = 0
@@ -88,7 +125,10 @@ async def daily_digest_job() -> None:
                 .order_by(Conversation.id)
             )
             convs = list((await session.execute(conv_stmt)).scalars().all())
-            if not convs:
+
+            memoir = await _memoir_counts(session, elderly_user_id, day_start)
+            # 既没聊过、也没有新的可见回忆 → 今天没有可报的，跳过
+            if not convs and not memoir["today"]:
                 continue
 
             # 老人姓名
@@ -97,7 +137,7 @@ async def daily_digest_job() -> None:
             )).scalar_one_or_none()
             elderly_name = prof or "老人家"
 
-            payload = await build_digest_payload(elderly_name, convs, date_str)
+            payload = await build_digest_payload(elderly_name, convs, date_str, memoir=memoir)
             content = json.dumps(payload, ensure_ascii=False)
 
             family_ids = await FamilyRepo(session).list_family(elderly_user_id)

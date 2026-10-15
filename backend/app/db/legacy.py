@@ -101,6 +101,80 @@ CREATE TABLE IF NOT EXISTS recommendation_feedback (
     created_at            TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
 CREATE INDEX IF NOT EXISTS idx_feedback_user ON recommendation_feedback (user_id);
+
+-- ---------------------------------------------------------------------------
+-- 回忆录四张表。
+-- 与 app/db/models.py 的 ORM 定义同构：ORM 走 create_all（生产/异步），这里走
+-- init_db（dev 同步链路 + tests 的 init_db()）。两处必须同步改，否则测试看不到表。
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS life_stories (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    elderly_user_id   TEXT NOT NULL,
+    title             TEXT NOT NULL DEFAULT '',
+    summary           TEXT NOT NULL DEFAULT '',
+    raw_dialogue      TEXT,                      -- JSON，只增不改（契约5）
+    time_type         TEXT NOT NULL DEFAULT 'relative',
+    time_value        TEXT NOT NULL DEFAULT '',
+    time_confidence   REAL NOT NULL DEFAULT 0,
+    time_inferred     INTEGER NOT NULL DEFAULT 0,
+    era_tags          TEXT,                      -- JSON 数组
+    place             TEXT NOT NULL DEFAULT '',
+    people            TEXT,                      -- JSON 数组
+    emotion_tone      TEXT NOT NULL DEFAULT '平淡',
+    completeness      REAL NOT NULL DEFAULT 0,
+    status            TEXT NOT NULL DEFAULT 'draft',
+    visibility        TEXT NOT NULL DEFAULT 'family',   -- 契约2 默认 family
+    visibility_locked INTEGER NOT NULL DEFAULT 0,
+    avoid_flag        INTEGER NOT NULL DEFAULT 0,
+    source_msg_ids    TEXT,
+    created_at        TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    updated_at        TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+);
+CREATE INDEX IF NOT EXISTS ix_life_stories_user_status ON life_stories (elderly_user_id, status);
+CREATE INDEX IF NOT EXISTS ix_life_stories_user_eras ON life_stories (elderly_user_id, era_tags);
+
+CREATE TABLE IF NOT EXISTS story_elicitation_queue (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    elderly_user_id   TEXT NOT NULL,
+    story_id          INTEGER NOT NULL,
+    question          TEXT NOT NULL DEFAULT '',
+    gap_type          TEXT NOT NULL DEFAULT 'missing_detail',
+    priority          REAL NOT NULL DEFAULT 0.5,
+    status            TEXT NOT NULL DEFAULT 'pending',
+    ask_count         INTEGER NOT NULL DEFAULT 0,
+    cooldown_until    TEXT,
+    created_at        TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    asked_at          TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_story_queue_story ON story_elicitation_queue (story_id);
+CREATE INDEX IF NOT EXISTS ix_story_queue_user_status
+    ON story_elicitation_queue (elderly_user_id, status, cooldown_until);
+
+CREATE TABLE IF NOT EXISTS story_media (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    story_id     INTEGER NOT NULL,
+    type         TEXT NOT NULL DEFAULT 'photo',
+    url          TEXT NOT NULL DEFAULT '',
+    caption      TEXT NOT NULL DEFAULT '',
+    uploaded_by  TEXT NOT NULL DEFAULT '',
+    created_at   TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+);
+CREATE INDEX IF NOT EXISTS ix_story_media_story ON story_media (story_id);
+
+CREATE TABLE IF NOT EXISTS story_compilations (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    elderly_user_id   TEXT NOT NULL,
+    title             TEXT NOT NULL DEFAULT '',
+    story_ids         TEXT,                      -- JSON 数组
+    perspective       TEXT NOT NULL DEFAULT 'first_person',
+    status            TEXT NOT NULL DEFAULT 'queued',
+    prompt_package    TEXT,                      -- JSON
+    prompt_model      TEXT NOT NULL DEFAULT '',
+    video_url         TEXT,                      -- 预留，恒为 NULL（契约6）
+    created_by        TEXT NOT NULL DEFAULT '',
+    created_at        TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+);
+CREATE INDEX IF NOT EXISTS ix_story_compilations_user ON story_compilations (elderly_user_id, created_at);
 """
 
 

@@ -11,6 +11,7 @@ import { EmotionTrendChart } from '@/components/EmotionTrendChart';
 import { EmotionInsights } from '@/components/EmotionInsights';
 import { MemoryList } from '@/components/MemoryList';
 import { PersonNetwork } from '@/components/PersonNetwork';
+import { FamilyMemoirPanel } from '@/components/FamilyMemoirPanel';
 import { extractPersons } from '@/lib/personExtract';
 
 const MSG_CATEGORIES = [
@@ -28,10 +29,17 @@ interface DigestStats {
   topics: { topic: string; count: number }[];
   time_range: string;
 }
+/** 日报里的回忆录增量（只含老人愿意分享的条目） */
+interface DigestMemoir {
+  today: number;
+  week: number;
+  total: number;
+}
 interface DigestPayload {
   date?: string;
   summary?: string;
   stats?: DigestStats;
+  memoir?: DigestMemoir;
 }
 
 function parseDigest(content: string): DigestPayload | null {
@@ -71,6 +79,7 @@ function DigestCard({ msg, onRead }: { msg: FamilyMessageItem; onRead: (id: numb
     );
   }
   const s = digest.stats;
+  const m = digest.memoir;
   return (
     <li
       className={`rounded-2xl px-4 py-4 border-2 ${
@@ -87,9 +96,11 @@ function DigestCard({ msg, onRead }: { msg: FamilyMessageItem; onRead: (id: numb
       </div>
       {s && (
         <div className="flex flex-wrap gap-2 mb-2">
-          <span className="text-xs bg-white border border-warm-light rounded-full px-2 py-1">
-            💬 {s.rounds} 轮
-          </span>
+          {s.rounds > 0 && (
+            <span className="text-xs bg-white border border-warm-light rounded-full px-2 py-1">
+              💬 {s.rounds} 轮
+            </span>
+          )}
           {s.main_emotion_label && (
             <span className="text-xs bg-white border border-warm-light rounded-full px-2 py-1">
               😊 {s.main_emotion_label}
@@ -103,6 +114,26 @@ function DigestCard({ msg, onRead }: { msg: FamilyMessageItem; onRead: (id: numb
           {s.time_range && (
             <span className="text-xs bg-white border border-warm-light rounded-full px-2 py-1">
               🕐 {s.time_range}
+            </span>
+          )}
+        </div>
+      )}
+      {/* 回忆录增量：只包含老人愿意分享的条目，创伤类 private 不进计数 */}
+      {m && (m.today > 0 || m.week > 0) && (
+        <div className="flex flex-wrap gap-2 mb-2">
+          {m.today > 0 && (
+            <span className="text-xs bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-full px-2 py-1">
+              📖 {m.today === 1 ? '今天留下了一段新回忆' : `今天留下了 ${m.today} 段新回忆`}
+            </span>
+          )}
+          {m.week > 0 && (
+            <span className="text-xs bg-white border border-warm-light rounded-full px-2 py-1">
+              本周新增 {m.week} 段
+            </span>
+          )}
+          {m.total > 0 && (
+            <span className="text-xs bg-white border border-warm-light rounded-full px-2 py-1">
+              共 {m.total} 段
             </span>
           )}
         </div>
@@ -143,7 +174,7 @@ export default function FamilyPage() {
   const [ackingId, setAckingId] = useState<number | null>(null);
   const [alertElderly, setAlertElderly] = useState<string>('all');
   const [selectedPerson, setSelectedPerson] = useState<string | null>(null);
-  const [tab, setTab] = useState<'emotion' | 'memories'>('emotion');
+  const [tab, setTab] = useState<'emotion' | 'memories' | 'memoir'>('emotion');
   const [bindUsername, setBindUsername] = useState('');
   const [inviteCode, setInviteCode] = useState('');
   const [error, setError] = useState('');
@@ -302,6 +333,13 @@ export default function FamilyPage() {
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '加载记忆失败');
     }
+  };
+
+  // 回忆录是只读的（外加补照片），数据在面板内部自取，这里只切 tab
+  const handleViewMemoir = (elderlyId: string) => {
+    setSelectedId(elderlyId);
+    setSelectedPerson(null);
+    setTab('memoir');
   };
 
   const loadTrend = async (elderlyId: string, d: 7 | 30) => {
@@ -632,7 +670,7 @@ export default function FamilyPage() {
                   </p>
                   <p className="text-sm text-gray-500">@{e.username}</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <LargeButton
                     variant={selectedId === e.elderly_id && tab === 'emotion' ? 'primary' : 'secondary'}
                     onClick={() => handleViewEmotion(e.elderly_id)}
@@ -644,6 +682,12 @@ export default function FamilyPage() {
                     onClick={() => handleViewMemories(e.elderly_id)}
                   >
                     🧠 记忆
+                  </LargeButton>
+                  <LargeButton
+                    variant={selectedId === e.elderly_id && tab === 'memoir' ? 'primary' : 'secondary'}
+                    onClick={() => handleViewMemoir(e.elderly_id)}
+                  >
+                    📖 回忆录
                   </LargeButton>
                 </div>
               </li>
@@ -979,6 +1023,11 @@ export default function FamilyPage() {
             <MemoryList memories={visibleMemories} />
           </div>
         </section>
+      )}
+
+      {/* 选中老人的回忆录（只读 + 补照片） */}
+      {selectedId !== null && tab === 'memoir' && (
+        <FamilyMemoirPanel elderlyId={selectedId} elderlyName={selectedElderlyName} />
       )}
     </div>
   );

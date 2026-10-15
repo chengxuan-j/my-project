@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { chatApi, dogApi, ApiError, recommendApi, familyMessageApi, FamilyMessageItem, FamilyPerson } from '@/lib/api';
+import { chatApi, dogApi, ApiError, recommendApi, familyMessageApi, FamilyMessageItem, FamilyPerson, memoirApi, MemoirStory } from '@/lib/api';
 import { useServerEvents } from '@/lib/events';
 import { useAuthStore } from '@/stores/auth';
 import { useSettingsStore } from '@/stores/settings';
@@ -12,6 +12,7 @@ import { TTSPlayer } from '@/components/TTSPlayer';
 import { LargeButton } from '@/components/LargeButton';
 import { SpeakButton } from '@/components/SpeakButton';
 import { CameraPanel } from '@/components/CameraPanel';
+import { StoryConfirmCard } from '@/components/StoryConfirmCard';
 
 interface RecommendItem {
   title: string;
@@ -80,6 +81,8 @@ export default function ChatPage() {
   const [sendingFam, setSendingFam] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [dogRelay, setDogRelay] = useState<{ text: string; relation?: string; content?: string; dogSpoke?: boolean } | null>(null);
+  // 回忆录：待老人确认的往事条目（一次只展示一条）
+  const [pendingStories, setPendingStories] = useState<MemoirStory[]>([]);
   const listRef = useRef<HTMLDivElement>(null);
   const [hydrated, setHydrated] = useState(false);
 
@@ -132,6 +135,15 @@ export default function ChatPage() {
         setFamFamilies(fams);
         if (fams.length > 0) setFamTarget(fams[0].family_user_id);
       })
+      .catch(() => {});
+  }, [hydrated, accessToken, user?.role]);
+
+  // 回忆录：进页面拉一次待确认条目；失败静默（该功能不可用不应打扰老人）
+  useEffect(() => {
+    if (!hydrated || !accessToken || user?.role !== 'elderly') return;
+    memoirApi
+      .pendingStories()
+      .then(setPendingStories)
       .catch(() => {});
   }, [hydrated, accessToken, user?.role]);
 
@@ -215,6 +227,35 @@ export default function ChatPage() {
       setError(err instanceof ApiError ? err.message : '发送失败，请重试');
     } finally {
       setSending(false);
+    }
+
+    // 生平故事提取是 /chat 的后台任务，稍等片刻再拉一次待确认列表；
+    // 失败静默——不能因为回忆录功能让聊天报错。
+    window.setTimeout(() => {
+      memoirApi
+        .pendingStories()
+        .then(setPendingStories)
+        .catch(() => {});
+    }, 3200);
+  };
+
+  // 老人对某段往事的处置：确认留档 / 先不用（契约1，只有老人端会调用）
+  const handleStoryDecided = async (
+    id: number,
+    via: 'button' | 'voice',
+    action: 'confirm' | 'discard'
+  ) => {
+    try {
+      if (action === 'confirm') {
+        await memoirApi.confirmStory(id, via);
+      } else {
+        await memoirApi.discardStory(id, via);
+      }
+      setPendingStories((prev) => prev.filter((s) => s.id !== id));
+    } catch {
+      // 失败就重新同步一次，避免界面与后端不一致
+      memoirApi.pendingStories().then(setPendingStories).catch(() => {});
+      setError(action === 'confirm' ? '没记上，请再试一次' : '操作没成功，请再试一次');
     }
   };
 
@@ -530,6 +571,13 @@ export default function ChatPage() {
           {error}
         </div>
       )}
+
+      {/* 回忆录：老人端留档确认卡（契约1，仅老人端出现） */}
+      <StoryConfirmCard
+        stories={pendingStories}
+        onConfirm={(id, via) => handleStoryDecided(id, via, 'confirm')}
+        onDiscard={(id, via) => handleStoryDecided(id, via, 'discard')}
+      />
 
       {/* 推荐卡片 */}
       {recommendation && (

@@ -84,6 +84,25 @@ class Settings(BaseSettings):
     # 本地想验证定时任务时在 .env 设 SCHEDULER_ENABLED=true
     scheduler_enabled: bool = False
 
+    # ---------- 回忆录（生平故事 / 时代轴 / 故事板） ----------
+    # 暗发布开关：默认关时 /chat 行为与既有功能完全不受影响，
+    # M0 提取精度达标后在 .env 设 MEMOIR_ENABLED=true 打开。
+    memoir_enabled: bool = False
+    # 每轮会话最多追问几个缺口（契约3 硬上限）
+    memoir_max_asks_per_session: int = 1
+    # 同一缺口追问后的冷却天数（避免唠叨）
+    memoir_gap_cooldown_days: int = 3
+    # 夜间缺口扫描时刻（把候选算好，避免对话中现算）
+    memoir_gap_scan_hour: int = 1
+    memoir_gap_scan_minute: int = 30
+    # 短片编排的故事板总时长上限（秒）
+    memoir_storyboard_seconds: int = 60
+    # 回忆照片落盘目录（相对 BASE_DIR）。刻意不挂 StaticFiles：
+    # 照片必须走鉴权接口读，否则 trauma 故事的 private 照片等于"知道 URL 就能看"。
+    memoir_media_dir: str = "storage/memoir_media"
+    # 单张照片大小上限（MB）——与 vision 的 5MB 对齐，前端不必两套提示
+    memoir_media_max_mb: int = 5
+
     # ---------- 应用 ----------
     environment: str = "development"          # development / staging / production
     log_level: str = "INFO"

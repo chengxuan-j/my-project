@@ -12,6 +12,7 @@ from app.llm.qwen_client import QwenClient
 from app.memory.conversation_summarizer import ConversationSummarizer
 from app.memory.memory_extractor import MemoryExtractor
 from app.memory.memory_manager import MemoryManager
+from app.memoir.story_extractor import StoryExtractor
 from app.rag.knowledge_base import KnowledgeBase
 
 
@@ -33,6 +34,12 @@ def get_memory_extractor() -> MemoryExtractor:
 @lru_cache(maxsize=1)
 def get_conversation_summarizer() -> ConversationSummarizer:
     return ConversationSummarizer(get_qwen_client())
+
+
+@lru_cache(maxsize=1)
+def get_story_extractor() -> StoryExtractor:
+    """生平故事提取器（回忆录管线，与事实记忆提取器相互独立）。"""
+    return StoryExtractor(get_qwen_client())
 
 
 @lru_cache(maxsize=1)

@@ -11,10 +11,12 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from app.companion.companion_policy import CompanionPolicy, PolicyDecision
 from app.companion.safety import assess_safety
+from app.config import get_settings
 from app.content import music, stories
 from app.emotion.emotion_analyzer import AnalysisResult
 from app.memory.long_memory import LongMemoryStore
 from app.memory.short_memory import ShortMemory, extract_topic
+from app.memoir import elicitation
 from app.profile.elderly_profile import ElderlyProfile, ProfileStore
 from app.rag.knowledge_base import KnowledgeBase
 from app.scene import scene_detector
@@ -39,6 +41,9 @@ class ChatContext:
     recommendation: Optional[Dict[str, Any]] = None  # 第 6 轮推荐内容（音乐/故事）
     long_memories: List[Dict[str, Any]] = field(default_factory=list)
     knowledge_results: List[Dict[str, Any]] = field(default_factory=list)
+    # M4：本轮的追问决定（含 follow_up_hint）。None = 本轮不追问。
+    # 只是"预选"，真正记账由 chat 路由在**生成成功之后**做，见 elicitation。
+    elicitation: Optional[Dict[str, Any]] = None
 
 
 class MemoryManager:
@@ -138,6 +143,11 @@ class MemoryManager:
             )
             recommendation = recs[0] if recs else None
 
+        elicitation = await self._resolve_elicitation(
+            user_id, message=message, history=history, topic=topic,
+            risk_level=risk, emotion_intensity=intensity,
+        )
+
         return ChatContext(
             profile=profile,
             history=history,
@@ -154,7 +164,45 @@ class MemoryManager:
             recommendation=recommendation,
             long_memories=long_memories,
             knowledge_results=knowledge_results,
+            elicitation=elicitation,
         )
+
+    async def _resolve_elicitation(
+        self,
+        user_id: str,
+        *,
+        message: str,
+        history: List[Tuple[str, str]],
+        topic: str,
+        risk_level: str,
+        emotion_intensity: float,
+    ) -> Optional[Dict[str, Any]]:
+        """M4：算本轮要不要顺带追问一个回忆缺口。
+
+        两道开关：`memoir_enabled` 未开时整段跳过（暗发布，零影响）；
+        `risk_level != "low"` 时干脆不算——elicitation 内部还会再拦一次，
+        这里提前短路是为了不白查一次库。
+
+        只做**预选**，不记账：生成失败就等于没问出口，不该占用会话额度。
+        """
+        settings = get_settings()
+        if not settings.memoir_enabled or risk_level != "low":
+            return None
+
+        # 「回复变短」的基线：只看老人自己的发言，助手的长回复会污染均值
+        user_lens = [len(c) for role, c in history if role == "user" and c]
+        avg_len = sum(user_lens) / len(user_lens) if user_lens else 0.0
+
+        decision = await elicitation.preview_for_turn(
+            user_id,
+            risk_level=risk_level,
+            current_len=len(message or ""),
+            recent_user_len_avg=avg_len,
+            emotion_intensity=emotion_intensity,
+            topic=topic,
+            max_asks_per_session=settings.memoir_max_asks_per_session,
+        )
+        return decision.as_dict() if decision else None
 
     def save_turn(self, user_id: str, ctx: ChatContext,
                   user_msg: str, ai_reply: str) -> int:

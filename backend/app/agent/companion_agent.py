@@ -96,6 +96,8 @@ async def build_context(user_id: str, message: str,
         "long_memories": ctx.long_memories,
         "knowledge_results": ctx.knowledge_results,
         "safety_directive": ctx.safety_directive,
+        # M4：本轮预选的追问缺口（None = 不追问）。记账在 chat 路由做。
+        "elicitation": ctx.elicitation,
         "_ctx": ctx,  # 内部对象，供 generate 工具直接复用
     }
 

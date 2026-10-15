@@ -12,6 +12,7 @@ from app.api.v1 import (
     feedback,
     health,
     knowledge,
+    memoir,
     profile,
     speech,
     vision,
@@ -32,3 +33,4 @@ api_router.include_router(feedback.router)
 api_router.include_router(events.router)
 api_router.include_router(vision.router)
 api_router.include_router(dog.router)
+api_router.include_router(memoir.router)
