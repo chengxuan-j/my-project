@@ -117,17 +117,59 @@ async def execute_stop(base_url: str, timeout: float = 5.0) -> bool:
     return True
 
 
+async def ensure_dog_awake(client) -> bool:
+    """确保狗处于唤醒（listening）状态，否则先唤醒 + 把音量拉满。
+
+    2026-10-16 实测：ESP-Hi 休眠时 `/status` 返回 {"listening": false}，
+    此时它**不连小智服务**（/devices 为空）、也不处理下发语音——
+    这是"狗在线却不出声"的真正原因（与配网/防火墙无关）。
+    唤醒方式就是遥控页「唤醒」按钮的请求：POST /control {"wake": "on"}。
+
+    唤醒后顺手把音量设为 max：固件音量出厂/重置后可能很低，是"下发成功但听不到"
+    的常见原因（/control 只接受字符串音量：{"volume": "max"} 或 "up"，数字会被拒）。
+    """
+    settings = get_settings()
+    dog_base = settings.dog_base_url.rstrip("/")
+    try:
+        st = await client.get(f"{dog_base}/status", timeout=3.0)
+        listening = bool((st.json() or {}).get("listening"))
+        if listening:
+            return True
+        logger.info("狗处于休眠状态，先唤醒")
+        w = await client.post(
+            f"{dog_base}/control", json={"wake": "on"}, timeout=3.0
+        )
+        ok = w.status_code == 200
+        logger.info("唤醒狗 -> %s", ok)
+        if ok:
+            await asyncio.sleep(1.5)  # 等固件建立到小智的连接
+            try:
+                await client.post(
+                    f"{dog_base}/control", json={"volume": "max"}, timeout=3.0
+                )
+                logger.info("已把狗音量设为 max")
+            except Exception as e:  # noqa: BLE001  音量设置失败不阻断
+                logger.info("设置狗音量失败（不阻断）: %s", e)
+        return ok
+    except Exception as e:  # noqa: BLE001  唤醒失败不阻断（可能狗就没在线）
+        logger.info("检查/唤醒狗失败（不阻断）: %s", e)
+        return False
+
+
 async def push_to_dog(text: str) -> bool:
     """把一句话推给当前已连接小智服务端的机器狗，让它开口念出来。
 
     返回 True 表示已成功下发朗读任务（不代表狗一定播放成功）。
     狗未连接 / 小智服务不可达时静默失败，不影响主流程。
+    下发前会先检测狗是否休眠，休眠则自动唤醒（见 ensure_dog_awake）。
     """
     settings = get_settings()
     # 从视觉地址推导出小智 HTTP 基址：http://127.0.0.1:8003/mcp/... -> http://127.0.0.1:8003
     base = settings.xiaozhi_vision_url.split("/mcp", 1)[0].rstrip("/")
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
+            # 休眠时必须先唤醒，否则设备不会出现在 /devices 里
+            await ensure_dog_awake(client)
             r = await client.get(f"{base}/devices")
             if r.status_code != 200:
                 return False

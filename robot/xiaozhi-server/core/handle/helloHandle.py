@@ -40,6 +40,26 @@ wakeup_words_config = WakeupWordsConfig()
 _wakeup_response_lock = asyncio.Lock()
 
 
+def _rebuild_opus_encoder(conn) -> None:
+    """按 conn.sample_rate 重建 TTS 的 opus 编码器（采样率与设备不一致时调用）。
+
+    TTS 的编码器只在 open_audio_channels 时按当时的 conn.sample_rate 创建一次，
+    之后不随 hello 更新——所以采样率变了必须重建，否则编码/解码不一致。
+    """
+    try:
+        tts = getattr(conn, "tts", None)
+        if tts is None:
+            return  # TTS 还没初始化，后续 open_audio_channels 会用新采样率创建
+        from core.utils import opus_encoder_utils
+
+        tts.opus_encoder = opus_encoder_utils.OpusEncoderUtils(
+            sample_rate=conn.sample_rate, channels=1, frame_size_ms=60
+        )
+        conn.logger.bind(tag=TAG).info("opus 编码器已按新采样率重建")
+    except Exception as e:  # noqa: BLE001
+        conn.logger.bind(tag=TAG).warning(f"重建 opus 编码器失败: {e}")
+
+
 async def handleHelloMessage(conn: "ConnectionHandler", msg_json):
     """处理hello消息"""
     audio_params = msg_json.get("audio_params")
@@ -48,6 +68,18 @@ async def handleHelloMessage(conn: "ConnectionHandler", msg_json):
         conn.logger.bind(tag=TAG).debug(f"客户端音频格式: {format}")
         conn.audio_format = format
         conn.welcome_msg["audio_params"] = audio_params
+
+        # 同步输出采样率（2026-10-16 修）：连接初始化时 conn.sample_rate 用的是配置
+        # 默认值（24000），而设备可能声明 16000——不同步的话 opus 编码器按 24k 编码，
+        # 设备按 16k 解码 → 播放异常/无声（实测 ESP-Hi 声明 16000）。
+        try:
+            sr = int(audio_params.get("sample_rate") or 0)
+        except (TypeError, ValueError):
+            sr = 0
+        if sr > 0 and sr != getattr(conn, "sample_rate", None):
+            conn.sample_rate = sr
+            conn.logger.bind(tag=TAG).info(f"按设备声明更新输出采样率: {sr}")
+            _rebuild_opus_encoder(conn)
     features = msg_json.get("features")
     if features:
         conn.logger.bind(tag=TAG).debug(f"客户端特性: {features}")
