@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { chatApi, dogApi, ApiError, recommendApi, familyMessageApi, FamilyMessageItem, FamilyPerson, memoirApi, MemoirStory } from '@/lib/api';
+import { chatApi, dogApi, ApiError, recommendApi, familyMessageApi, FamilyMessageItem, FamilyPerson, memoirApi, MemoirStory, speechApi } from '@/lib/api';
 import { useServerEvents } from '@/lib/events';
 import { useAuthStore } from '@/stores/auth';
 import { useSettingsStore } from '@/stores/settings';
@@ -66,6 +66,8 @@ export default function ChatPage() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [lastReply, setLastReply] = useState<string | null>(null);
+  // 流式路径已经逐句播过音，此时 TTSPlayer 只留"重播"按钮、不再自动播放
+  const [autoSpoken, setAutoSpoken] = useState(false);
   const [recommendation, setRecommendation] = useState<Recommendation | null>(null);
   const [recPool, setRecPool] = useState<RecommendItem[]>([]);
   const [recOffset, setRecOffset] = useState(0);
@@ -193,38 +195,124 @@ export default function ChatPage() {
       content: text.trim(),
       timestamp: Date.now(),
     };
-    setMessages((m) => [...m, userMsg]);
+    const aiId = `a-${Date.now()}`;
+    // 先放一个空的 AI 气泡，流式增量往里填，实现"边生成边显示"
+    setMessages((m) => [
+      ...m,
+      userMsg,
+      { id: aiId, role: 'assistant', content: '', timestamp: Date.now() },
+    ]);
     setInput('');
     setSending(true);
 
-    try {
-      const res = await chatApi.send(text.trim());
-      const aiMsg: Message = {
-        id: `a-${Date.now()}`,
-        role: 'assistant',
-        content: res.reply,
-        emotion: res.emotion,
-        riskLevel: res.risk_level,
-        intent: res.intent,
-        scene: res.scene,
-        topic: res.topic,
-        need: res.need,
-        action: res.action,
-        actionReason: res.action_reason,
-        recalledMemories: res.recalled_memories,
-        timestamp: Date.now(),
-      };
-      setMessages((m) => [...m, aiMsg]);
-      setLastReply(res.reply);
-      if (res.recommendation) {
-        setRecommendation(
-          typeof res.recommendation === 'string'
-            ? { title: '为您推荐', content: res.recommendation }
-            : res.recommendation
-        );
+    let acc = '';        // 累积的完整回复
+    let spoken = 0;      // 已送去合成的字符下标（按句切分）
+    let spokeAnything = false;
+    const queue: string[] = [];   // 待播音频 URL 队列
+    let playing = false;
+
+    const playNext = () => {
+      const url = queue.shift();
+      if (!url) {
+        playing = false;
+        return;
       }
+      playing = true;
+      const audio = new Audio(url);
+      audio.onended = playNext;
+      audio.onerror = playNext;
+      audio.play().catch(() => {
+        playing = false;
+      });
+    };
+
+    // 每凑齐若干句就**逐句**合成并排队播放：第一句一好就出声，
+    // 不必等整段生成完再合成（首句出声因此明显提前）
+    const SENT_PUNCT = '。！？!?；;\n';
+    const speakOne = (sentence: string) => {
+      spokeAnything = true;
+      speechApi
+        .tts(sentence)
+        .then((r) => {
+          if (!r.audio_url) return;
+          queue.push(r.audio_url);
+          if (!playing) playNext();
+        })
+        .catch(() => {
+          // 单句合成失败不影响后续句子
+        });
+    };
+
+    const flushSentences = (final: boolean) => {
+      const pending = acc.slice(spoken);
+      if (!pending) return;
+      // 取到最后一个句末标点；final 时把剩余全部视为完整
+      let cut = 0;
+      for (let i = 0; i < pending.length; i++) {
+        if (SENT_PUNCT.includes(pending[i])) cut = i + 1;
+      }
+      if (final) cut = pending.length;
+      if (cut === 0) return;
+      const block = pending.slice(0, cut);
+      spoken += cut;
+      // 按句末标点切开，逐句送去合成
+      for (const s of block.split(/(?<=[。！？!?；;\n])/)) {
+        const piece = s.trim();
+        if (piece) speakOne(piece);
+      }
+    };
+
+    try {
+      await chatApi.sendStream(text.trim(), {
+        onDelta: (t) => {
+          acc += t;
+          setMessages((m) =>
+            m.map((x) => (x.id === aiId ? { ...x, content: acc } : x))
+          );
+          flushSentences(false);
+        },
+        onDone: (res) => {
+          const reply = res.reply || acc;
+          acc = reply;
+          setMessages((m) =>
+            m.map((x) =>
+              x.id === aiId
+                ? {
+                    ...x,
+                    content: reply,
+                    emotion: res.emotion,
+                    riskLevel: res.risk_level,
+                    intent: res.intent,
+                    scene: res.scene,
+                    topic: res.topic,
+                    need: res.need,
+                    action: res.action,
+                    actionReason: res.action_reason,
+                    recalledMemories: res.recalled_memories,
+                  }
+                : x
+            )
+          );
+          setLastReply(reply);
+          setAutoSpoken(spokeAnything);
+          if (res.recommendation) {
+            setRecommendation(
+              typeof res.recommendation === 'string'
+                ? { title: '为您推荐', content: res.recommendation }
+                : res.recommendation
+            );
+          }
+        },
+        onError: (detail) => {
+          setError(detail);
+          // 去掉没填上内容的空气泡，避免留个空白框
+          setMessages((m) => m.filter((x) => !(x.id === aiId && !x.content)));
+        },
+      });
+      flushSentences(true);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '发送失败，请重试');
+      setMessages((m) => m.filter((x) => !(x.id === aiId && !x.content)));
     } finally {
       setSending(false);
     }
@@ -364,7 +452,7 @@ export default function ChatPage() {
           >
             {autoTTS ? '🔊 自动播报' : '🔇 静音'}
           </button>
-          <TTSPlayer text={autoTTS ? lastReply : null} autoPlay />
+          <TTSPlayer text={autoTTS ? lastReply : null} autoPlay={!autoSpoken} />
         </div>
       </div>
 

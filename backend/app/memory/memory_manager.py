@@ -5,6 +5,7 @@
 - save_turn(...)（本轮对话落库）
 - save_extracted_memories(...)（Qwen 判断出的长期记忆写入，路由以后台任务调用）
 """
+import asyncio
 import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
@@ -79,12 +80,14 @@ class MemoryManager:
             topic = extract_topic(message) or state["current_topic"]
             scene = state["scene"]
 
-        # 长期记忆检索：message + topic 一次批量检索（单次 embedding 调用，省一次 API 往返）
-        # 注意：topic 从 analysis 来，所以必须在 analysis 之后算
-        long_memories = await self.long.search_multi(user_id, [message, topic])
-        # RAG 知识库：只注入与当前问题相关的全局/该老人专属资料。
-        knowledge_results = await self.knowledge.search(
-            f"{message} {topic}".strip(), user_id=user_id, top_k=4
+        # 长期记忆检索 + RAG 知识库：两路互不依赖，**并发执行**。
+        # 实测各自 1.3~1.6s，串行会白等约 1.4s；并发后取较慢的一路。
+        # 注意：topic 来自 analysis，所以必须在 analysis 之后发起。
+        long_memories, knowledge_results = await asyncio.gather(
+            self.long.search_multi(user_id, [message, topic]),
+            self.knowledge.search(
+                f"{message} {topic}".strip(), user_id=user_id, top_k=4
+            ),
         )
 
         # 第 5 轮：陪伴策略决策（规则引擎，确定性）

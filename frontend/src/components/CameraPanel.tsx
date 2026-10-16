@@ -488,10 +488,9 @@ export function CameraPanel({ onClose, onVoice }: CameraPanelProps) {
     }
   };
 
-  /** 轮询间隔 0.5s（提速） */
-  const pollVoiceResult = async (taskId: string, maxTries = 40): Promise<string | null> => {
+  /** 轮询识别结果：首次立即查询，之后 300ms 起逐步放宽到 1s */
+  const pollVoiceResult = async (taskId: string, maxTries = 30): Promise<string | null> => {
     for (let i = 0; i < maxTries; i++) {
-      await new Promise((r) => setTimeout(r, 500));
       const res = await speechApi.asrResult(taskId);
       if (res.status === 'done' || res.status === 'success' || res.text) {
         return res.text || null;
@@ -499,6 +498,7 @@ export function CameraPanel({ onClose, onVoice }: CameraPanelProps) {
       if (res.status === 'failed' || res.status === 'error') {
         throw new Error(res.error || '识别失败');
       }
+      await new Promise((r) => setTimeout(r, Math.min(300 * (i + 1), 1000)));
     }
     throw new Error('识别超时');
   };

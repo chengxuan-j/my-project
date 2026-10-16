@@ -219,9 +219,88 @@ export interface EmotionTrendDay {
   record_count: number;
 }
 
+export interface ChatStreamHandlers {
+  /** 收到一段文本增量（边生成边回调） */
+  onDelta: (text: string) => void;
+  /** 生成完成，携带与 /chat 同结构的完整元数据 */
+  onDone: (resp: ChatResp) => void;
+  /** 失败（含网络中断） */
+  onError: (message: string) => void;
+}
+
 export const chatApi = {
   send: (message: string) =>
     api<ChatResp>('/chat', { method: 'POST', body: { message } }),
+
+  /**
+   * 预生成（"边说边算"）：老人还在说话时，用部分识别结果先让后端把回复算起来。
+   * 立即返回，不等待；之后 sendStream 若命中缓存就会跳过分析与生成直接出字。
+   */
+  speculate: (message: string) =>
+    api<{ accepted: boolean }>('/chat/speculate', {
+      method: 'POST',
+      body: { message },
+    }),
+
+  /**
+   * 流式聊天：POST /chat/stream（SSE），逐段回调文本增量。
+   *
+   * 用 fetch + ReadableStream 读 SSE —— EventSource 不支持 POST 与自定义请求头，
+   * 拿不到 Authorization。首字延迟因此从"整段生成完"降到"首个 token"。
+   */
+  sendStream: async (message: string, h: ChatStreamHandlers): Promise<void> => {
+    const { accessToken } = useAuthStore.getState();
+    const resp = await fetch(`${BASE_URL}/chat/stream`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      body: JSON.stringify({ message }),
+    });
+
+    if (!resp.ok || !resp.body) {
+      let detail = `请求失败 (${resp.status})`;
+      try {
+        const d = await resp.json();
+        if (d?.detail) detail = String(d.detail);
+      } catch {
+        // 响应不是 JSON，保留默认提示
+      }
+      h.onError(detail);
+      return;
+    }
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        let idx: number;
+        // SSE 以空行分隔事件；一次 read 可能带来多个事件或半个事件
+        while ((idx = buf.indexOf('\n\n')) >= 0) {
+          const raw = buf.slice(0, idx);
+          buf = buf.slice(idx + 2);
+          const line = raw.split('\n').find((l) => l.startsWith('data:'));
+          if (!line) continue;
+          let evt: { type?: string; text?: string; detail?: string } & Partial<ChatResp>;
+          try {
+            evt = JSON.parse(line.slice(5).trim());
+          } catch {
+            continue;
+          }
+          if (evt.type === 'delta' && evt.text) h.onDelta(evt.text);
+          else if (evt.type === 'done') h.onDone(evt as ChatResp);
+          else if (evt.type === 'error') h.onError(evt.detail || '生成失败');
+        }
+      }
+    } catch {
+      h.onError('连接中断，请重试');
+    }
+  },
 };
 
 export interface Profile {

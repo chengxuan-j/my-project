@@ -51,10 +51,58 @@ async def lifespan(app: FastAPI):
     #    → retinaface 兜底加载 → 两级 + 表情模型全部进内存。失败不影响启动。
     asyncio.create_task(_warmup_face_emotion())
 
+    # 5) 后台预热 LLM/Embedding 的 HTTP 连接（2026-10-16）：
+    #    首次调用要建 TCP+TLS，实测一次 embed 冷启动 1.21s、热态仅 0.12s。
+    #    不预热的话，重启后第一位老人的第一句会白等约 1 秒。
+    asyncio.create_task(_warmup_llm())
+
     yield
 
-    # 5) 停止调度器
+    # 6) 停止调度器
     await stop_scheduler()
+
+
+async def _warmup_llm() -> None:
+    """预热 Qwen chat / embedding 连接，以及 Agent 前置链路。
+
+    实测：重启后**第一条真实请求**首个 delta 要 9s（原始连接 1.2s 之外，
+    还有画像加载、LangGraph 首次执行、DB 会话建立等一次性开销）。
+    这里除了热连接，还跑一次完整的 prepare()（分析 + 检索，不写任何状态），
+    把整条前置链路预热，让第一位老人的第一句话不再白等。
+    """
+    try:
+        client = QwenClient()
+        if not client.is_configured:
+            return
+        # 一次极小 chat + 一次 embedding，把两条连接的池子都热起来
+        await client.chat(
+            [{"role": "user", "content": "你好"}], temperature=0.0, max_tokens=1
+        )
+        await client.embed(["预热"])
+        logger.info("llm_connections_warmed_up")
+    except Exception as e:  # noqa: BLE001  预热失败不影响启动
+        logger.warning("llm_warmup_failed", error=str(e))
+        return
+
+    try:
+        # 应用层预热：用库里第一位老人跑一次 prepare（只读，不落任何数据）
+        from sqlalchemy import select
+
+        from app.agent import companion_agent
+        from app.db.base import get_session_factory
+        from app.db.models import Account
+
+        async with get_session_factory()() as session:
+            uid = (
+                await session.execute(
+                    select(Account.user_id).limit(1)
+                )
+            ).scalar_one_or_none()
+        if uid:
+            await companion_agent.prepare(uid, "你好")
+            logger.info("agent_pipeline_warmed_up")
+    except Exception as e:  # noqa: BLE001
+        logger.warning("agent_warmup_failed", error=str(e))
 
 
 async def _warmup_face_emotion() -> None:
