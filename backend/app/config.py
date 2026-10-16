@@ -75,6 +75,11 @@ class Settings(BaseSettings):
     dog_base_url: str = "http://10.1.56.231"
     dog_timeout: float = 5.0
 
+    # ---------- 表情关怀话术（老人端表情识别 → 机器狗发声） ----------
+    # false：写死话术库轮换（默认，零延迟零成本、稳定可预期）；
+    # true：改用 Qwen 即时生成（失败自动降级写死），适合想听"新鲜话"的场景。
+    care_llm_enabled: bool = False
+
     # ---------- 每日陪伴日报推送（家属端） ----------
     # 每天把老人与陪伴助手的聊天汇总（统计 + AI 摘要）推进家属看板
     digest_enabled: bool = True
@@ -85,9 +90,12 @@ class Settings(BaseSettings):
     scheduler_enabled: bool = False
 
     # ---------- 回忆录（生平故事 / 时代轴 / 故事板） ----------
-    # 暗发布开关：默认关时 /chat 行为与既有功能完全不受影响，
-    # M0 提取精度达标后在 .env 设 MEMOIR_ENABLED=true 打开。
-    memoir_enabled: bool = False
+    # 2026-10-15 起改为「实时回忆模式」并默认开启：
+    # 老人消息命中回忆类关键词（以前/当年/知青/粮票……）即触发一次 LLM 提取，
+    # 判定是平生故事就以 archived 直接记档，并 SSE 实时推送绑定家属。
+    # 不攒完整度、不需要老人确认；创伤/回避内容仍锁 private 不推送（契约2）。
+    # 想关掉：.env 设 MEMOIR_ENABLED=false，/chat 行为回到纯陪伴。
+    memoir_enabled: bool = True
     # 每轮会话最多追问几个缺口（契约3 硬上限）
     memoir_max_asks_per_session: int = 1
     # 同一缺口追问后的冷却天数（避免唠叨）

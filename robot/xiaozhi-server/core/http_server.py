@@ -1,4 +1,5 @@
 import asyncio
+import json
 from aiohttp import web
 from config.logger import setup_logging
 from core.api.ota_handler import OTAHandler
@@ -66,6 +67,17 @@ class SimpleHttpServer:
             )
 
         try:
+            # 关键修复（2026-10-16）：设备只有收到 {"type":"tts","state":"start"} 才会
+            # 从 listening 切换到 speaking 状态并开启音频输出。正常对话路径由
+            # send_stt_message 发送此消息，而 say 路径绕过了 STT，导致设备一直停在
+            # listening（日志可见它持续上报 listen start auto），把下发的音频帧当回声丢弃。
+            await handler.websocket.send(
+                json.dumps(
+                    {"type": "tts", "state": "start", "session_id": handler.session_id}
+                )
+            )
+            handler.client_is_speaking = True
+            await asyncio.sleep(0.15)  # 给固件一点时间切换状态机
             ok = handler.speak_text(text)
         except Exception as e:  # noqa: BLE001
             self.logger.bind(tag=TAG).error(f"下发朗读失败: {e}")
@@ -80,8 +92,53 @@ class SimpleHttpServer:
             {"status": "ok", "device_id": device_id, "text": text}
         )
 
-    async def say_options(self, request: web.Request):
-        return web.Response(
+    async def call_device_tool(self, request: web.Request):
+        """调试用：直接调用设备端暴露的 MCP 工具（2026-10-16 加）。
+
+        POST /devices/{device_id}/tool  {"name": "self.get_device_status", "arguments": {}}
+        典型用途：查设备真实状态（音量/电池/网络）、用官方工具设音量
+        （self.audio_speaker.set_volume，arguments {"volume": 0-100}）。
+        绕过 LLM，仅用于排查"设备在线但不出声"这类问题。
+        """
+        device_id = request.match_info["device_id"]
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({"error": "invalid json body"}, status=400)
+
+        name = str((body or {}).get("name") or "").strip()
+        arguments = (body or {}).get("arguments") or {}
+        if not name:
+            return web.json_response({"error": "missing 'name'"}, status=400)
+
+        handler = get_device(device_id)
+        if handler is None:
+            return web.json_response(
+                {"error": "device not connected", "device_id": device_id,
+                 "online_devices": online_device_ids()},
+                status=404,
+            )
+
+        try:
+            from core.providers.tools.device_mcp.mcp_executor import (
+                DeviceMCPExecutor,
+            )
+
+            executor = DeviceMCPExecutor(handler)
+            result = await executor.execute(handler, name, arguments)
+            # 结果可能在 response（设备返回含 action 的 JSON）或 result（REQLLM 路径）
+            text = (
+                getattr(result, "response", None)
+                or getattr(result, "result", None)
+                or str(result)
+            )
+            self.logger.info(f"call_device_tool: {name} -> {str(text)[:200]}")
+            return web.json_response({"status": "ok", "tool": name, "result": str(text)})
+        except Exception as e:  # noqa: BLE001
+            self.logger.error(f"call_device_tool 失败: {e}")
+            return web.json_response({"error": str(e)}, status=500)
+
+    async def say_options(self, request: web.Request):        return web.Response(
             status=204,
             headers={
                 "Access-Control-Allow-Origin": "*",
@@ -137,6 +194,11 @@ class SimpleHttpServer:
                         ),
                         web.options(
                             "/devices/{device_id}/say", self.say_options
+                        ),
+                        # 调试用：直接调用设备端 MCP 工具（2026-10-16 加，
+                        # 用于查/设音量等设备状态，如 self.get_device_status）
+                        web.post(
+                            "/devices/{device_id}/tool", self.call_device_tool
                         ),
                     ]
                 )

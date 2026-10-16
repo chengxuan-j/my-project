@@ -13,14 +13,16 @@ from app.core.container import (
     get_story_extractor,
 )
 from app.core.dependencies import get_current_account
+from app.core.events import bus
 from app.db.base import get_session_factory
 from app.db.models import Account
 from app.llm.qwen_client import LLMError
 from app.memory.conversation_summarizer import ConversationSummarizer
 from app.memory.memory_extractor import MemoryExtractor
 from app.memory.memory_manager import MemoryManager
-from app.memoir import elicitation, story_service
+from app.memoir import elicitation, recall_keywords, story_service
 from app.memoir.story_extractor import StoryExtractor
+from app.repositories.profile_repo import FamilyRepo
 from app.schemas import ChatRequest, ChatResponse
 
 logger = logging.getLogger(__name__)
@@ -66,21 +68,52 @@ async def _extract_and_save_story(
     user_msg: str,
     ai_reply: str,
 ) -> None:
-    """后台任务：生平故事提取 + 落库（回忆录管线，与事实记忆完全独立）。
+    """后台任务：实时回忆模式——关键词命中即提取、记档并推送家属。
 
-    - 与 `_extract_and_save` 共用同一套调度模式（后台、异步、失败静默）；
-    - 只写 life_stories / story_elicitation_queue，不碰 memories；
-    - LLM 不可用 → 静默返回，绝不影响 /chat 主流程。
+    链路（与事实记忆管线完全独立）：
+    1. 关键词快筛：消息命中回忆类词（以前/当年/知青/粮票……）才继续，
+       不命中直接返回，不花 LLM 调用；
+    2. LLM 把关：StoryExtractor 判断这一轮是不是值得留档的平生故事
+       （is_life_story），不是就静默结束；
+    3. 落库：ingest_realtime 直接以 archived 记档（家属端立即可见），
+       创伤/回避内容仍按契约2 锁 private；
+    4. 推送：只对 visibility ∈ (family, public) 的故事，向该老人的
+       全部绑定家属发 SSE `memoir_story` 事件（private 连事件都不发，
+       免得暴露"有一条不能看的记录"）。
+
+    任何一步失败都静默记录，绝不影响 /chat 主流程。
     """
     try:
+        hit_word = recall_keywords.matched_word(user_msg)
+        if not hit_word:
+            return
         extraction = await extractor.extract(user_msg, ai_reply)
         if not extraction:
             return
         async with get_session_factory()() as session:
-            await story_service.ingest(session, user_id, extraction, user_msg, ai_reply)
+            story = await story_service.ingest_realtime(
+                session, user_id, extraction, user_msg, ai_reply
+            )
+            if story is None:
+                return
             await session.commit()
+            if story.visibility in ("family", "public"):
+                families = await FamilyRepo(session).list_family(user_id)
+                for family_id in families:
+                    bus.publish(family_id, {
+                        "type": "memoir_story",
+                        "elderly_user_id": user_id,
+                        "story_id": story.id,
+                        "title": story.title,
+                        "summary": story.summary,
+                        "hit_word": hit_word,
+                    })
+                logger.info(
+                    "回忆实时推送 user=%s story=%s 家属=%d 命中词=%s",
+                    user_id, story.id, len(families), hit_word,
+                )
     except Exception:
-        logger.exception("后台生平故事提取异常 user_id=%s", user_id)
+        logger.exception("后台实时回忆异常 user_id=%s", user_id)
 
 
 async def _finalize_memoir(
@@ -150,7 +183,7 @@ async def chat(
 
     if ctx["risk_level"] != "high":
         background.add_task(_extract_and_save, memory, extractor, user_id, msg, reply)
-        # 回忆录：生平故事提取（暗发布，MEMOIR_ENABLED=true 才启用）
+        # 回忆录：实时回忆模式（关键词命中即记档并推送家属，MEMOIR_ENABLED 可关）
         if settings.memoir_enabled:
             background.add_task(_extract_and_save_story, story_extractor, user_id, msg, reply)
 

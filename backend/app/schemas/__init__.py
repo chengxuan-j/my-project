@@ -182,6 +182,8 @@ class FaceEmotionResponse(BaseModel):
     score: float = 0.0               # 主表情置信度 0~100
     scores: dict[str, float] = {}    # 7 类表情得分
     region: Optional[dict] = None    # 人脸框 {x,y,w,h}
+    detector: str = ""               # 命中的检测器：opencv / retinaface（排查用）
+    face_confidence: Optional[float] = None   # 人脸检测置信度 0~1
     dog_reacted: bool = False        # 是否触发了机器狗安慰
     dog_reached: bool = False        # 狗是否实际收到指令
     speech: str = ""                 # 安慰时说的话

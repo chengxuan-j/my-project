@@ -410,6 +410,37 @@ async def family_messages(
 
 # ----- 老人侧 -----
 
+@router.post("/elderly/{elderly_id}/digest/today")
+async def refresh_digest_today(
+    elderly_id: str,
+    account: Account = Depends(require_family),
+    session: AsyncSession = Depends(get_db),
+):
+    """家属端「立即获取今日陪伴日报」（2026-10-16 新增）。
+
+    不必等每天 20:30 的定时推送——家属任何时候点一下就能拿到今天的日报：
+    - 今天还没生成过 → 立即生成（统计 + AI 摘要 + 回忆录增量），写入消息列表并 SSE 通知；
+    - 今天已生成过 → 直接返回已有内容（不重复花 LLM，保证同日口径一致）；
+    - 今天没有任何动静（没聊天也没新回忆）→ 返回 digest=None，前端提示"今天还没有记录"。
+
+    与定时任务共用 daily_digest.generate_digest_for，两边口径不会漂移。
+    """
+    from datetime import datetime, timedelta
+
+    from app.scheduler.jobs.daily_digest import generate_digest_for
+
+    if elderly_id not in await FamilyRepo(session).list_elderly(account.user_id):
+        raise HTTPException(status_code=403, detail="未绑定该老人")
+
+    day_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    date_str = day_start.strftime("%Y-%m-%d")
+
+    result = await generate_digest_for(session, elderly_id, day_start, date_str)
+    if result is None:
+        return {"status": "ok", "generated": False, "digest": None, "reason": "no_activity"}
+    return {"status": "ok", **result}
+
+
 @router.get("/my-families")
 async def my_families(
     account: Account = Depends(require_elderly),

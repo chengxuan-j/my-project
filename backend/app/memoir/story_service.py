@@ -111,6 +111,77 @@ async def ingest(
     return story
 
 
+# ---------- 实时回忆模式（2026-10-15，关键词触发即记档即推送） ----------
+
+
+async def ingest_realtime(
+    session,
+    elderly_user_id: str,
+    extraction: dict[str, Any],
+    user_message: str,
+    ai_reply: str = "",
+    *,
+    avoided: bool = False,
+    source_msg_ids: Optional[list[int]] = None,
+) -> Optional[LifeStory]:
+    """实时回忆模式：老人聊到往事即记档，直接 archived，家属端立即可见。
+
+    与 `ingest`（攒够了再请老人确认）的区别：
+    - 不做完整度/置信度门槛——老人讲了就记，不等攒；
+    - status 直接 archived，不进 pending_confirm，不需要老人确认；
+    - **保留契约2**：创伤基调或老人回避过的内容仍判 private 并锁定，
+      调用方不得推送（见 chat.py 的推送条件）。
+
+    缺口照样排队（追问机制原样保留），raw_dialogue 同样留底。
+    """
+    if not extraction or not extraction.get("is_life_story"):
+        return None
+
+    time_info = extraction.get("time") or {}
+    visibility, locked = resolve_visibility(extraction, avoided=avoided)
+    completeness = estimate_completeness(extraction)
+
+    stories = StoryRepo(session)
+    story = await stories.create(
+        elderly_user_id,
+        title=extraction.get("title", ""),
+        summary=extraction.get("summary", ""),
+        raw_dialogue=[
+            {"role": "user", "content": user_message},
+            {"role": "assistant", "content": ai_reply},
+        ],
+        time_type=time_info.get("type", "relative"),
+        time_value=time_info.get("value", ""),
+        time_confidence=float(time_info.get("confidence") or 0.0),
+        era_tags=extraction.get("era_tags") or [],
+        place=extraction.get("place", ""),
+        people=extraction.get("people") or [],
+        emotion_tone=extraction.get("emotion_tone", "平淡"),
+        completeness=completeness,
+        status="archived",
+        visibility=visibility,
+        visibility_locked=locked,
+        avoid_flag=avoided,
+        source_msg_ids=source_msg_ids or [],
+    )
+
+    queue = ElicitationRepo(session)
+    for gap in detect_gaps(extraction):
+        await queue.add(
+            elderly_user_id, story.id,
+            question=gap["question"], gap_type=gap["gap_type"], priority=gap["priority"],
+        )
+
+    # 与 ingest 相同：老人刚说清楚的信息，关掉同类旧缺口，避免重复追问
+    await elicitation.close_asked_gaps(session, elderly_user_id, extraction)
+
+    logger.info(
+        "实时回忆入库 user=%s story=%s visibility=%s locked=%s 完整度=%.2f",
+        elderly_user_id, story.id, visibility, locked, completeness,
+    )
+    return story
+
+
 # ---------- M3：时间轴读取（只读，无任何写路径） ----------
 
 async def load_profile_entries(session, elderly_user_id: str) -> list[str]:

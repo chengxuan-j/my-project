@@ -18,6 +18,7 @@
 import json
 import logging
 from datetime import datetime, timedelta
+from typing import Optional
 
 from sqlalchemy import distinct, select
 
@@ -92,8 +93,92 @@ async def _has_digest_today(session, elderly_user_id: str, day_start: datetime) 
     return (await session.execute(stmt)).scalar_one_or_none() is not None
 
 
+async def generate_digest_for(
+    session,
+    elderly_user_id: str,
+    day_start: datetime,
+    date_str: str,
+) -> Optional[dict]:
+    """为单个老人生成今日日报（无则生成、有则返回已有的）。
+
+    定时任务与家属端「立即获取」接口共用这一条路径，保证两边口径一致：
+    同一天只生成一次（重复调用返回已有内容，不重复花 LLM）。
+
+    返回 None 表示今天没有可报的内容（没聊天、也没有新的可见回忆）。
+    已绑定家属时顺带写 FamilyMessage + SSE 通知；未绑定家属时只返回 payload
+    （给「立即获取」接口用——没绑定家属的老人，家属端根本调不到这个接口，
+    但定时任务遍历到时要能安静跳过）。
+    """
+    from app.services.digest_service import parse_digest_content
+
+    if await _has_digest_today(session, elderly_user_id, day_start):
+        stmt = (
+            select(FamilyMessage)
+            .where(
+                FamilyMessage.elderly_user_id == elderly_user_id,
+                FamilyMessage.sender_role == "elderly",
+                FamilyMessage.category == DIGEST_CATEGORY,
+                FamilyMessage.created_at >= day_start,
+            )
+            .order_by(FamilyMessage.id.desc())
+            .limit(1)
+        )
+        existing = (await session.execute(stmt)).scalar_one_or_none()
+        if existing is not None:
+            payload = parse_digest_content(existing.content)
+            if payload is not None:
+                return {"generated": False, "digest": payload, "date": date_str}
+
+    # 当天全部对话（时间正序）
+    day_end = day_start + timedelta(days=1)
+    conv_stmt = (
+        select(Conversation)
+        .where(
+            Conversation.user_id == elderly_user_id,
+            Conversation.created_at >= day_start,
+            Conversation.created_at < day_end,
+        )
+        .order_by(Conversation.id)
+    )
+    convs = list((await session.execute(conv_stmt)).scalars().all())
+
+    memoir = await _memoir_counts(session, elderly_user_id, day_start)
+    # 既没聊过、也没有新的可见回忆 → 今天没有可报的
+    if not convs and not memoir["today"]:
+        return None
+
+    prof = (await session.execute(
+        select(ElderlyProfile.name).where(ElderlyProfile.user_id == elderly_user_id)
+    )).scalar_one_or_none()
+    elderly_name = prof or "老人家"
+
+    payload = await build_digest_payload(elderly_name, convs, date_str, memoir=memoir)
+    content = json.dumps(payload, ensure_ascii=False)
+
+    family_ids = await FamilyRepo(session).list_family(elderly_user_id)
+    if family_ids:
+        msg_repo = FamilyMessageRepo(session)
+        for family_user_id in family_ids:
+            await msg_repo.create(
+                family_user_id, elderly_user_id, content,
+                DIGEST_CATEGORY, sender_role="elderly",
+            )
+            # 实时通知在线家属
+            bus.publish(
+                family_user_id,
+                {
+                    "type": "family_digest",
+                    "elderly_user_id": elderly_user_id,
+                    "date": date_str,
+                },
+            )
+        await session.commit()
+
+    return {"generated": True, "digest": payload, "date": date_str}
+
+
 async def daily_digest_job() -> None:
-    """每日陪伴日报推送。"""
+    """每日陪伴日报推送（定时，默认每天 20:30）。"""
     logger.info("执行每日陪伴日报任务")
     day_start, day_end = _today_range()
     date_str = day_start.strftime("%Y-%m-%d")
@@ -110,57 +195,13 @@ async def daily_digest_job() -> None:
 
         pushed = 0
         for elderly_user_id in elderly_ids:
-            if await _has_digest_today(session, elderly_user_id, day_start):
-                logger.info("老人 %s 今日日报已生成，跳过", elderly_user_id)
+            result = await generate_digest_for(session, elderly_user_id, day_start, date_str)
+            if result is None:
                 continue
-
-            # 当天全部对话（时间正序）
-            conv_stmt = (
-                select(Conversation)
-                .where(
-                    Conversation.user_id == elderly_user_id,
-                    Conversation.created_at >= day_start,
-                    Conversation.created_at < day_end,
-                )
-                .order_by(Conversation.id)
-            )
-            convs = list((await session.execute(conv_stmt)).scalars().all())
-
-            memoir = await _memoir_counts(session, elderly_user_id, day_start)
-            # 既没聊过、也没有新的可见回忆 → 今天没有可报的，跳过
-            if not convs and not memoir["today"]:
-                continue
-
-            # 老人姓名
-            prof = (await session.execute(
-                select(ElderlyProfile.name).where(ElderlyProfile.user_id == elderly_user_id)
-            )).scalar_one_or_none()
-            elderly_name = prof or "老人家"
-
-            payload = await build_digest_payload(elderly_name, convs, date_str, memoir=memoir)
-            content = json.dumps(payload, ensure_ascii=False)
-
-            family_ids = await FamilyRepo(session).list_family(elderly_user_id)
-            if not family_ids:
-                logger.info("老人 %s 未绑定家属，日报不推送", elderly_user_id)
-                continue
-
-            msg_repo = FamilyMessageRepo(session)
-            for family_user_id in family_ids:
-                await msg_repo.create(
-                    family_user_id, elderly_user_id, content,
-                    DIGEST_CATEGORY, sender_role="elderly",
-                )
-                # 实时通知在线家属
-                bus.publish(
-                    family_user_id,
-                    {
-                        "type": "family_digest",
-                        "elderly_user_id": elderly_user_id,
-                        "date": date_str,
-                    },
-                )
+            if result["generated"]:
                 pushed += 1
+            else:
+                logger.info("老人 %s 今日日报已生成，跳过", elderly_user_id)
 
         await session.commit()
-        logger.info("每日陪伴日报完成：%d 位老人，推送 %d 条", len(elderly_ids), pushed)
+        logger.info("每日陪伴日报完成：%d 位老人，新推送 %d 条", len(elderly_ids), pushed)

@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { familyApi, dogApi, ApiError, ElderlyItem, EmotionRecord, MemoryItem, FamilyAlert, EmotionTrendDay, FamilyMessageItem, familyMessageApi } from '@/lib/api';
+import { familyApi, dogApi, ApiError, ElderlyItem, EmotionRecord, MemoryItem, FamilyAlert, EmotionTrendDay, FamilyMessageItem, familyMessageApi, DigestPayload } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth';
 import { useServerEvents } from '@/lib/events';
 import { LargeButton } from '@/components/LargeButton';
@@ -20,27 +20,6 @@ const MSG_CATEGORIES = [
   { value: 'remind', label: '叮嘱', emoji: '📌' },
   { value: 'miss', label: '想念', emoji: '💝' },
 ];
-
-/** 日报 content（JSON）的结构 */
-interface DigestStats {
-  rounds: number;
-  main_emotion: string;
-  main_emotion_label: string;
-  topics: { topic: string; count: number }[];
-  time_range: string;
-}
-/** 日报里的回忆录增量（只含老人愿意分享的条目） */
-interface DigestMemoir {
-  today: number;
-  week: number;
-  total: number;
-}
-interface DigestPayload {
-  date?: string;
-  summary?: string;
-  stats?: DigestStats;
-  memoir?: DigestMemoir;
-}
 
 function parseDigest(content: string): DigestPayload | null {
   try {
@@ -183,6 +162,16 @@ export default function FamilyPage() {
   const [hydrated, setHydrated] = useState(false);
   // 老人实时表情（摄像头表情识别推送）：elderly_id → 最新一次识别
   const [liveEmotions, setLiveEmotions] = useState<Record<string, LiveEmotion>>({});
+  // 实时回忆推送（老人聊到往事 → SSE memoir_story）：刷新计数 + 轻提示
+  const [memoirTick, setMemoirTick] = useState(0);
+  const [memoirToast, setMemoirToast] = useState('');
+  // 「立即获取今日日报」按钮状态
+  const [digestLoading, setDigestLoading] = useState(false);
+  const [digestHint, setDigestHint] = useState('');
+  // 「家人和系统消息 / 我发出的留言」折叠状态（收纳，2026-10-16）
+  const [inboxOpen, setInboxOpen] = useState(false);
+  const [sentOpen, setSentOpen] = useState(false);
+  const inboxUnread = inboxMsgs.filter((m) => !m.is_read).length;
 
   // 让小狗传话（仅传话，不指挥动作）
   const RELATIONS = ['女儿', '儿子', '孙女', '孙子', '外孙女', '外孙', '儿媳', '女婿'];
@@ -234,6 +223,9 @@ export default function FamilyPage() {
         setMsgTarget(list[0].elderly_id);
         loadSent(list[0].elderly_id);
       }
+      // 默认选中第一位老人：让「立即获取今日日报」等入口开页即可点，
+      // 不依赖用户先手动点某个 tab 按钮
+      setSelectedId((prev) => prev ?? list[0]?.elderly_id ?? null);
     } catch {
       setElderlyList([]);
     }
@@ -246,7 +238,7 @@ export default function FamilyPage() {
     }
   };
 
-  // SSE：老人发来的留言 / 回应 / 实时表情识别结果，无需手动刷新
+  // SSE：老人发来的留言 / 回应 / 实时表情识别结果 / 实时回忆，无需手动刷新
   useServerEvents(
     accessToken,
     (e) => {
@@ -271,6 +263,22 @@ export default function FamilyPage() {
             ]);
           }
         }
+        return;
+      }
+      // 老人刚聊起一段往事：已记档，刷新回忆录面板并轻提示
+      if (e.type === 'memoir_story') {
+        setMemoirTick((t) => t + 1);
+        const who = String(e.elderly_user_id ?? '') === selectedId
+          ? selectedElderlyName
+          : '老人';
+        setMemoirToast(`📖 ${who}刚聊起一段往事，已收进回忆录`);
+        window.setTimeout(() => setMemoirToast(''), 5000);
+        return;
+      }
+      // 老人新留言 / 新日报到达：刷新并自动展开收件箱（收纳状态下也要看得到）
+      if (e.type === 'family_message' || e.type === 'family_digest') {
+        setInboxOpen(true);
+        if (msgTarget) loadSent(msgTarget);
         return;
       }
       if (msgTarget) loadSent(msgTarget);
@@ -403,7 +411,60 @@ export default function FamilyPage() {
     }
   };
 
+  // 立即获取今日陪伴日报（不必等每天 20:30 的定时推送）
+  const handleRefreshDigest = async () => {
+    if (!selectedId) return;
+    setDigestLoading(true);
+    setDigestHint('');
+    try {
+      const res = await familyApi.refreshDigestToday(selectedId);
+      if (!res.digest) {
+        setDigestHint('今天老人这边还没有聊天记录，明晚 20:30 会自动生成第一份日报');
+        return;
+      }
+      const date = res.digest.date;
+      const item: FamilyMessageItem = {
+        id: -Date.now(),   // 临时条目（未落库），id<0；标为已读本地生效
+        family_user_id: user?.user_id ?? '',
+        elderly_user_id: selectedId,
+        content: JSON.stringify(res.digest),
+        category: 'digest',
+        sender_role: 'elderly',
+        is_read: false,
+        created_at: new Date().toISOString(),
+      };
+      // 同日只保留最新一条（定时任务已推过的替换掉，避免重复卡片）
+      setInboxOpen(true);   // 收纳状态下生成后自动展开，让家属立刻看到
+      setInboxMsgs((prev) => [
+        item,
+        ...prev.filter((m) => {
+          if (m.category !== 'digest') return true;
+          return parseDigest(m.content)?.date !== date;
+        }),
+      ]);
+      setDigestHint(
+        res.generated
+          ? '今日日报已生成（定时推送仍会在每天 20:30 进行）'
+          : '今日日报此前已生成，以上即是最新内容'
+      );
+      window.setTimeout(() => setDigestHint(''), 5000);
+    } catch (err) {
+      setDigestHint(err instanceof ApiError ? err.message : '获取失败，请稍后再试');
+    } finally {
+      setDigestLoading(false);
+    }
+  };
+
   const handleMsgRead = async (id: number, reaction?: string) => {
+    // 临时插入的日报条目（id<0，未落库）：本地标记已读即可
+    if (id < 0) {
+      setInboxMsgs((prev) =>
+        prev.map((m) =>
+          m.id === id ? { ...m, is_read: true, reaction: reaction ?? m.reaction } : m
+        )
+      );
+      return;
+    }
     try {
       await familyMessageApi.markRead(id, reaction);
       setInboxMsgs((prev) =>
@@ -749,10 +810,44 @@ export default function FamilyPage() {
             </LargeButton>
           </form>
 
-          {inboxMsgs.length > 0 && (
-            <div className="mt-4">
-              <h3 className="font-medium text-gray-700 mb-2">家人和系统消息</h3>
-              <ul className="space-y-2">
+      {/* 家人和系统消息（折叠收纳：标题栏常驻「今日日报」入口与未读角标） */}
+      {selectedId !== null && (
+        <div className="mt-4 border-2 border-warm-light rounded-2xl overflow-hidden">
+          <div className="flex items-center gap-2 bg-warm-light/40 px-4 py-2">
+            <button
+              type="button"
+              onClick={() => setInboxOpen((v) => !v)}
+              aria-expanded={inboxOpen}
+              className="flex items-center gap-2 flex-1 text-left min-h-[44px]"
+            >
+              <span className="font-medium text-gray-700">💬 家人和系统消息</span>
+              {inboxUnread > 0 && (
+                <span className="text-xs bg-rose-500 text-white rounded-full px-2 py-0.5">
+                  {inboxUnread} 条未读
+                </span>
+              )}
+              <span className="ml-auto text-gray-500">{inboxOpen ? '▾' : '▸'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleRefreshDigest}
+              disabled={digestLoading || !selectedId}
+              title="立即生成/获取今日陪伴日报，不必等每天 20:30 的定时推送"
+              className="text-sm text-warm-primary border border-warm-primary rounded-lg px-3 py-1 min-h-[36px] disabled:opacity-50"
+            >
+              {digestLoading ? '生成中…' : '📅 今日日报'}
+            </button>
+          </div>
+          {digestHint && (
+            <p className="text-sm text-warm-primary px-4 pt-2">{digestHint}</p>
+          )}
+          {inboxOpen && (
+            inboxMsgs.length === 0 ? (
+              <p className="text-sm text-gray-500 px-4 py-3">
+                今天还没有消息。点「今日日报」，马上为{selectedElderlyName}生成一份。
+              </p>
+            ) : (
+              <ul className="space-y-2 p-4 pt-2">
                 {inboxMsgs.map((m) =>
                   m.category === 'digest' ? (
                     <DigestCard key={m.id} msg={m} onRead={(id) => handleMsgRead(id)} />
@@ -789,25 +884,39 @@ export default function FamilyPage() {
                   )
                 )}
               </ul>
-            </div>
+            )
           )}
+        </div>
+      )}
 
+          {/* 我发出的留言（折叠收纳） */}
           {sentMsgs.length > 0 && (
-            <div className="mt-4">
-              <h3 className="font-medium text-gray-700 mb-2">我发出的留言</h3>
-              <ul className="space-y-2">
-                {sentMsgs.map((m) => (
-                  <li key={m.id} className="bg-warm-light/40 rounded-xl px-4 py-3">
-                    <p className="text-gray-900">{m.content}</p>
-                    <p className="text-sm text-gray-500 mt-1">
-                      {new Date(m.created_at).toLocaleString('zh-CN')} ·{' '}
-                      {m.is_read
-                        ? `✅ 老人已看到${m.reaction ? ` · 回应 ${m.reaction}` : ''}`
-                        : '⏳ 老人还没看到'}
-                    </p>
-                  </li>
-                ))}
-              </ul>
+            <div className="mt-3 border-2 border-warm-light rounded-2xl overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setSentOpen((v) => !v)}
+                aria-expanded={sentOpen}
+                className="w-full flex items-center gap-2 bg-warm-light/40 px-4 py-2 text-left min-h-[44px]"
+              >
+                <span className="font-medium text-gray-700">📮 我发出的留言</span>
+                <span className="text-sm text-gray-500">{sentMsgs.length} 条</span>
+                <span className="ml-auto text-gray-500">{sentOpen ? '▾' : '▸'}</span>
+              </button>
+              {sentOpen && (
+                <ul className="space-y-2 p-4 pt-2">
+                  {sentMsgs.map((m) => (
+                    <li key={m.id} className="bg-warm-light/40 rounded-xl px-4 py-3">
+                      <p className="text-gray-900">{m.content}</p>
+                      <p className="text-sm text-gray-500 mt-1">
+                        {new Date(m.created_at).toLocaleString('zh-CN')} ·{' '}
+                        {m.is_read
+                          ? `✅ 老人已看到${m.reaction ? ` · 回应 ${m.reaction}` : ''}`
+                          : '⏳ 老人还没看到'}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
         </section>
@@ -1025,9 +1134,23 @@ export default function FamilyPage() {
         </section>
       )}
 
-      {/* 选中老人的回忆录（只读 + 补照片） */}
+      {/* 选中老人的回忆录（只读 + 补照片；老人新聊往事时实时刷新） */}
       {selectedId !== null && tab === 'memoir' && (
-        <FamilyMemoirPanel elderlyId={selectedId} elderlyName={selectedElderlyName} />
+        <FamilyMemoirPanel
+          elderlyId={selectedId}
+          elderlyName={selectedElderlyName}
+          refreshKey={memoirTick}
+        />
+      )}
+
+      {/* 实时回忆轻提示（SSE memoir_story） */}
+      {memoirToast && (
+        <div
+          role="status"
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-warm-dark text-white px-5 py-3 rounded-xl shadow-lg text-base"
+        >
+          {memoirToast}
+        </div>
       )}
     </div>
   );

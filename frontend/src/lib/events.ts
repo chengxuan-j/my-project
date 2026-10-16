@@ -14,6 +14,7 @@ const EVENT_TYPES = [
   'family_digest',
   'dog_relay',
   'face_emotion',
+  'memoir_story',
 ];
 
 /**

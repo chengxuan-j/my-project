@@ -30,9 +30,12 @@ import {
 export function FamilyMemoirPanel({
   elderlyId,
   elderlyName,
+  refreshKey = 0,
 }: {
   elderlyId: string;
   elderlyName: string;
+  /** 变化时重新拉取（老人新聊出一段回忆时的实时刷新，2026-10-15） */
+  refreshKey?: number;
 }) {
   const [timeline, setTimeline] = useState<MemoirTimeline | null>(null);
   const [compilations, setCompilations] = useState<CompilationItem[]>([]);
@@ -68,7 +71,7 @@ export function FamilyMemoirPanel({
     setPreview(null);
     setLoading(true);
     load();
-  }, [load]);
+  }, [load, refreshKey]);
 
   const flash = (text: string) => {
     setToast(text);

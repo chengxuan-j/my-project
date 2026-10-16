@@ -34,7 +34,8 @@ EMOTION_LABEL_CN: Dict[str, str] = {
 # 连续 2 次相同 ≈ 表情持续 5 秒
 EMOTION_STREAK_TRIGGER = 2
 
-# 两次狗反应之间的最小间隔（秒），避免反复打扰
+# 两次狗反应之间的最小间隔（秒），避免反复打扰。
+# 2026-10-16 起支持按表情区分冷却（平静是常态要拉长间隔），见 care_speech.COOLDOWN_BY_EMOTION。
 REACTION_COOLDOWN = 60.0
 
 # 识别结果多久内算"当前表情"，供聊天 Agent 参考
@@ -106,26 +107,19 @@ class FaceEmotionService:
             raise FaceEmotionError("图片解码失败，请重试")
 
         self._ensure_model()
-        try:
-            faces = self._analyze_fn(
-                img,
-                actions=["emotion"],
-                detector_backend="opencv",
-                enforce_detection=False,
-                align=False,
-                silent=True,
-            )
-        except Exception as e:  # noqa: BLE001
-            # enforce_detection=False 下无人脸一般返回空列表而不是抛错，这里兜底
-            logger.warning("deepface 推理异常：%s", e)
-            return None
 
+        # 两级检测（2026-10-16）：haar 快但挑脸（光照/角度/距离），
+        # 检不到时用 retinaface 兜底（CPU 上每帧约 1~2 秒，5 秒一帧够用）。
+        # 老人的脸往往不正对镜头，只靠 haar 会"一直识别不出表情"。
+        faces = self._detect_and_analyze(img, "opencv")
+        used = "opencv"
         if not faces:
-            return None
+            logger.info("haar 未检出人脸，retinaface 兜底重试")
+            faces = self._detect_and_analyze(img, "retinaface")
+            used = "retinaface"
+            if not faces:
+                logger.info("两级检测均未检出人脸（图片可能没有正脸/太暗/太远）")
 
-        # enforce_detection=False 时，无脸会回退成"整图假脸"（face_confidence=0），
-        # 真实检测（opencv haar）的置信度在 (0,1]，据此过滤
-        faces = [f for f in faces if float(f.get("face_confidence") or 0) > 0.01]
         if not faces:
             return None
 
@@ -141,7 +135,30 @@ class FaceEmotionService:
             "scores": {k: round(float(v), 1) for k, v in scores.items()},
             "region": face.get("region"),
             "face_confidence": face.get("face_confidence"),
+            "detector": used,
         }
+
+    def _detect_and_analyze(self, img, backend: str) -> list:
+        """按指定检测器识别，返回**真实检出**的人脸列表。
+
+        `enforce_detection=False` 下无脸会回退成"整图假脸"（face_confidence≈0），
+        这里按置信度过滤掉，只留真检出。
+        """
+        try:
+            faces = self._analyze_fn(
+                img,
+                actions=["emotion"],
+                detector_backend=backend,
+                enforce_detection=False,
+                align=False,
+                silent=True,
+            )
+        except Exception as e:  # noqa: BLE001  检测器故障不应打断整个请求
+            logger.warning("deepface 推理异常(%s)：%s", backend, e)
+            return []
+        if not faces:
+            return []
+        return [f for f in faces if float(f.get("face_confidence") or 0) > 0.01]
 
     # ---------- 状态跟踪 ----------
 
@@ -160,12 +177,22 @@ class FaceEmotionService:
         st.ts = time.time()
         return st
 
-    def should_react(self, user_id: str) -> bool:
-        """同一表情连续达到阈值（≈ 持续 5 秒）且距上次反应超过冷却时间。"""
+    def should_react(self, user_id: str, emotion: str = "") -> bool:
+        """同一表情连续达到阈值（≈ 持续 5 秒）且距上次反应超过冷却时间。
+
+        冷却按表情取（care_speech.cooldown_for）：平静 5 分钟、惊讶 90 秒、
+        其余 60 秒——"每个表情都有语音"但不能变成唠叨。
+        """
         st = self._states.get(user_id)
         if not st or st.emotion_streak < EMOTION_STREAK_TRIGGER:
             return False
-        return time.time() - st.last_reaction_ts >= REACTION_COOLDOWN
+        try:
+            from app.services.care_speech import cooldown_for
+
+            cooldown = cooldown_for(emotion or st.emotion)
+        except Exception:  # noqa: BLE001  取不到就用默认
+            cooldown = REACTION_COOLDOWN
+        return time.time() - st.last_reaction_ts >= cooldown
 
     def mark_reacted(self, user_id: str) -> None:
         st = self._states.get(user_id)
