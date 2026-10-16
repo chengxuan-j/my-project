@@ -27,6 +27,10 @@ logger = logging.getLogger(__name__)
 # 这是整个链路最大的提速点（实测 277 字 → 80 字，生成耗时降 3 倍以上）
 MAX_REPLY_TOKENS = 150
 
+# 情境分析只带最近几条历史。实测把 13 条历史全塞进去，这一步会从 0.9s 涨到 2.2s；
+# 而情境判断主要依赖"当前这句话 + 少量上下文"，多塞收益低、代价高。
+ANALYSIS_HISTORY_TURNS = 4
+
 
 class AgentState(TypedDict, total=False):
     user_id: str
@@ -68,8 +72,11 @@ def reset_dependencies(deps: Optional[_Deps] = None) -> None:
 
 @tool
 async def analyze_situation(user_id: str, message: str) -> Dict[str, Any]:
-    """情境分析工具：识别老人当前情绪、意图、场景、需求与风险。"""
-    history = _deps.memory.short.recent_messages(user_id)
+    """情境分析工具：识别老人当前情绪、意图、场景、需求与风险。
+
+    只取最近 ANALYSIS_HISTORY_TURNS 条历史（见常量处的实测说明）。
+    """
+    history = _deps.memory.short.recent_messages(user_id)[-ANALYSIS_HISTORY_TURNS:]
     result: AnalysisResult = await _deps.analyzer.analyze(message, recent=history)
     return result.to_dict()
 
@@ -102,10 +109,14 @@ async def build_context(user_id: str, message: str,
     }
 
 
-@tool
-async def generate_reply(user_id: str, message: str,
-                         context: Dict[str, Any]) -> str:
-    """回复生成工具：注入画像+记忆+情境+策略，调用 Qwen 生成。"""
+def build_reply_messages(
+    user_id: str, message: str, context: Dict[str, Any]
+) -> List[Dict[str, str]]:
+    """构造生成阶段的 messages（画像 + 记忆 + 情境 + 策略 + 实时表情）。
+
+    由 generate_reply（非流式）与 stream_reply（流式）共用，
+    避免"流式/非流式"两条路径行为分叉。
+    """
     ctx = context["_ctx"]
     messages = build_messages(ctx, message)
     # 摄像头表情识别结果（5 分钟内有效）作为额外情境注入，
@@ -122,15 +133,57 @@ async def generate_reply(user_id: str, message: str,
                 "请在回复中自然照顾到这一情绪，不必点破摄像头。"
             ),
         })
+    return messages
+
+
+def reply_temperature(context: Dict[str, Any]) -> float:
+    """高风险时降低温度稳住语气，其余情况保持自然。两条生成路径共用。"""
+    return 0.5 if context["_ctx"].risk_level == "high" else 0.8
+
+
+@tool
+async def generate_reply(user_id: str, message: str,
+                         context: Dict[str, Any]) -> str:
+    """回复生成工具：注入画像+记忆+情境+策略，调用 Qwen 生成。"""
+    ctx = context["_ctx"]
+    messages = build_reply_messages(user_id, message, context)
     # DEBUG: 打印画像和 system prompt 关键部分
     logger.info("[DEBUG] user_id=%s, profile_name=%s, prompt_block=%s",
                 user_id, ctx.profile.name, ctx.profile.prompt_block())
     logger.info("[DEBUG] system_prompt (first 800 chars): %s",
                 messages[0]["content"][:800])
-    temperature = 0.5 if ctx.risk_level == "high" else 0.8
     # max_tokens 硬上限：老人陪伴回复本就该简短，同时显著缩短生成耗时
-    return await _deps.client.chat(messages, temperature=temperature,
+    return await _deps.client.chat(messages, temperature=reply_temperature(context),
                                    max_tokens=MAX_REPLY_TOKENS)
+
+
+async def prepare(user_id: str, message: str) -> Dict[str, Any]:
+    """只跑 analyze + context 两段（不含生成），返回 {analysis, context}。
+
+    供流式接口复用与 /chat 完全相同的前置逻辑：先拿到情境分析与检索结果，
+    再决定怎么生成，避免两条路径的画像/记忆注入出现差异。
+    """
+    analysis = await analyze_situation.ainvoke({
+        "user_id": user_id, "message": message,
+    })
+    ctx = await build_context.ainvoke({
+        "user_id": user_id, "message": message, "analysis": analysis,
+    })
+    return {"analysis": analysis, "context": ctx}
+
+
+async def stream_reply(user_id: str, message: str, context: Dict[str, Any]):
+    """流式生成回复：逐段 yield 文本增量（供 SSE 接口使用）。
+
+    相比 chat() 一次性返回，首字延迟从"整段生成完"降到"首个 token"，
+    老人能立刻看到/听到开头，体感快得多。
+    """
+    messages = build_reply_messages(user_id, message, context)
+    async for piece in _deps.client.chat_stream(
+        messages, temperature=reply_temperature(context),
+        max_tokens=MAX_REPLY_TOKENS,
+    ):
+        yield piece
 
 
 # ---------------------------------------------------------------------------

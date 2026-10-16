@@ -35,7 +35,10 @@ class Settings(BaseSettings):
     qwen_api_key: str = ""
     qwen_base_url: str = DEFAULT_BASE_URL
     qwen_model: str = "kimi-k3"
-    qwen_analysis_model: str = "kimi-k3"
+    # 情境分析（情绪/意图/话题/场景）是结构化分类任务，必须用**非推理**的轻量模型。
+    # 推理模型（如 kimi-k3）会把 token 全耗在思维链上、content 返回空，导致分析降级
+    # 且单步耗时 10s+（2026-10-16 实测 kimi-k3 11.19s vs qwen-flash 2.01s，同句对比）。
+    qwen_analysis_model: str = "qwen-flash"
     embedding_model: str = "text-embedding-v3"
     # 兼容旧环境变量名 QWEN_TIMEOUT
     request_timeout: float = Field(default=60.0, validation_alias="QWEN_TIMEOUT")

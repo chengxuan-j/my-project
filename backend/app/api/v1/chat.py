@@ -1,10 +1,15 @@
 """聊天路由（带 JWT 认证）。user_id 从 token 取，不再接受客户端传入。"""
+import json
 import logging
 import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 
+from app.agent.companion_agent import prepare as agent_prepare
 from app.agent.companion_agent import run as run_agent
+from app.agent.companion_agent import stream_reply as agent_stream_reply
+from app.agent import speculation
 from app.config import get_settings
 from app.core.container import (
     get_conversation_summarizer,
@@ -142,6 +147,86 @@ async def _finalize_memoir(
         logger.exception("回忆录收尾异常 user_id=%s", user_id)
 
 
+async def _finish_turn(
+    background: BackgroundTasks,
+    memory: MemoryManager,
+    extractor: MemoryExtractor,
+    summarizer: ConversationSummarizer,
+    story_extractor: StoryExtractor,
+    user_id: str,
+    msg: str,
+    reply: str,
+    ctx: dict,
+) -> str | None:
+    """回复产出后的公共收尾：保存轮次、回忆录收尾、挂后台任务。
+
+    /chat 与 /chat/stream 共用，保证两条路径行为完全一致。
+    返回 recommendation_id（无推荐时为 None）。
+    """
+    memory.save_turn(user_id, ctx["_ctx"], msg, reply)
+
+    # M4：回忆录收尾（同步做，见 _finalize_memoir 的说明）。
+    # 只在这轮真有问题要问、或老人明确表示不想谈时才付这份开销。
+    settings = get_settings()
+    if settings.memoir_enabled:
+        pending_decision = ctx.get("elicitation")
+        if pending_decision or elicitation.detect_avoidance(msg):
+            await _finalize_memoir(
+                user_id, msg, pending_decision, settings.memoir_gap_cooldown_days
+            )
+
+    if ctx["risk_level"] != "high":
+        background.add_task(_extract_and_save, memory, extractor, user_id, msg, reply)
+        # 回忆录：实时回忆模式（关键词命中即记档并推送家属，MEMOIR_ENABLED 可关）
+        if settings.memoir_enabled:
+            background.add_task(_extract_and_save_story, story_extractor, user_id, msg, reply)
+
+    # 检查是否需要压缩对话历史
+    if memory.should_compress_conversation(user_id):
+        background.add_task(_compress_conversation, memory, summarizer, user_id)
+
+    # 生成 recommendation_id 供前端提交反馈
+    return str(uuid.uuid4()) if ctx["recommendation"] else None
+
+
+def _response_fields(
+    user_id: str, ctx: dict, analysis: dict, reply: str, recommendation_id: str | None,
+) -> dict:
+    """构造返回体字段（/chat 与 /chat/stream 共用，避免响应结构漂移）。"""
+    return {
+        "reply": reply,
+        "user_id": user_id,
+        "name": ctx["profile"]["name"],
+        "emotion": ctx["emotion"],
+        "emotion_intensity": round(ctx["emotion_intensity"], 2),
+        "intent": ctx["intent"],
+        "scene": ctx["scene"],
+        "topic": ctx["topic"],
+        "need": ctx["need"],
+        "risk_level": ctx["risk_level"],
+        "action": ctx["action"],
+        "action_reason": ctx["action_reason"],
+        "recommendation": ctx["recommendation"],
+        "recommendation_id": recommendation_id,
+        "degraded": bool(analysis.get("degraded")),
+        "recalled_memories": [m["content"] for m in ctx["long_memories"]],
+        "knowledge_sources": [
+            {
+                "document_id": item["document_id"],
+                "title": item["title"],
+                "source": item.get("source", ""),
+                "score": item["score"],
+            }
+            for item in ctx.get("knowledge_results", [])
+        ],
+    }
+
+
+def _sse(payload: dict) -> str:
+    """SSE 单条事件（JSON 行）。ensure_ascii=False 保证中文直观可读。"""
+    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+
 @router.post("/chat", response_model=ChatResponse)
 async def chat(
     req: ChatRequest,
@@ -169,57 +254,123 @@ async def chat(
     analysis = result["analysis"]
     reply = result["reply"]
 
-    memory.save_turn(user_id, ctx["_ctx"], msg, reply)
-
-    # M4：回忆录收尾（同步做，见 _finalize_memoir 的说明）。
-    # 只在这轮真有问题要问、或老人明确表示不想谈时才付这份开销。
-    settings = get_settings()
-    if settings.memoir_enabled:
-        pending_decision = ctx.get("elicitation")
-        if pending_decision or elicitation.detect_avoidance(msg):
-            await _finalize_memoir(
-                user_id, msg, pending_decision, settings.memoir_gap_cooldown_days
-            )
-
-    if ctx["risk_level"] != "high":
-        background.add_task(_extract_and_save, memory, extractor, user_id, msg, reply)
-        # 回忆录：实时回忆模式（关键词命中即记档并推送家属，MEMOIR_ENABLED 可关）
-        if settings.memoir_enabled:
-            background.add_task(_extract_and_save_story, story_extractor, user_id, msg, reply)
-
-    # 检查是否需要压缩对话历史
-    if memory.should_compress_conversation(user_id):
-        background.add_task(_compress_conversation, memory, summarizer, user_id)
-
-    # 生成 recommendation_id 供前端提交反馈
-    recommendation_id = None
-    if ctx["recommendation"]:
-        recommendation_id = str(uuid.uuid4())
-
-    return ChatResponse(
-        reply=reply,
-        user_id=user_id,
-        name=ctx["profile"]["name"],
-        emotion=ctx["emotion"],
-        emotion_intensity=round(ctx["emotion_intensity"], 2),
-        intent=ctx["intent"],
-        scene=ctx["scene"],
-        topic=ctx["topic"],
-        need=ctx["need"],
-        risk_level=ctx["risk_level"],
-        action=ctx["action"],
-        action_reason=ctx["action_reason"],
-        recommendation=ctx["recommendation"],
-        recommendation_id=recommendation_id,
-        degraded=bool(analysis.get("degraded")),
-        recalled_memories=[m["content"] for m in ctx["long_memories"]],
-        knowledge_sources=[
-            {
-                "document_id": item["document_id"],
-                "title": item["title"],
-                "source": item.get("source", ""),
-                "score": item["score"],
-            }
-            for item in ctx.get("knowledge_results", [])
-        ],
+    recommendation_id = await _finish_turn(
+        background, memory, extractor, summarizer, story_extractor,
+        user_id, msg, reply, ctx,
     )
+    return ChatResponse(
+        **_response_fields(user_id, ctx, analysis, reply, recommendation_id)
+    )
+
+
+@router.post("/chat/stream")
+async def chat_stream(
+    req: ChatRequest,
+    background: BackgroundTasks,
+    account: Account = Depends(get_current_account),
+    memory: MemoryManager = Depends(get_memory_manager),
+    extractor: MemoryExtractor = Depends(get_memory_extractor),
+    summarizer: ConversationSummarizer = Depends(get_conversation_summarizer),
+    story_extractor: StoryExtractor = Depends(get_story_extractor),
+):
+    """流式聊天（SSE）：先做分析与检索，再逐段推送回复文本。
+
+    事件格式（每条形如 `data: {...}` + 空行）：
+      {"type":"delta","text":"…"}              文本增量，边生成边推
+      {"type":"done", …与 /chat 同结构字段}     收尾元数据（含完整 reply）
+      {"type":"error","detail":"…"}            失败
+
+    前置分析与后置收尾与 /chat 完全共用，唯一差别是生成阶段不再等整段完成，
+    因此首字延迟从"整段生成完"降到"首个 token"。 /chat 保持不变以便随时回退。
+    """
+    msg = req.message.strip()
+    if not msg:
+        raise HTTPException(status_code=400, detail="消息不能为空")
+    user_id = account.user_id
+
+    async def event_stream():
+        # —— 预生成命中（"边说边算"）：老人还在说话时已把回复算好，
+        #    这里直接推出去，跳过分析与生成，首字几乎即时。 ——
+        hit = speculation.take(user_id, msg)
+        if hit is not None and hit.get("reply"):
+            reply = hit["reply"]
+            ctx = hit.get("context") or {}
+            analysis = hit.get("analysis") or {}
+            yield _sse({"type": "delta", "text": reply})
+            try:
+                recommendation_id = await _finish_turn(
+                    background, memory, extractor, summarizer, story_extractor,
+                    user_id, msg, reply, ctx,
+                )
+            except Exception:  # noqa: BLE001
+                logger.exception("预生成收尾异常 user_id=%s", user_id)
+                recommendation_id = None
+            yield _sse({"type": "done", **_response_fields(
+                user_id, ctx, analysis, reply, recommendation_id)})
+            return
+
+        try:
+            prepared = await agent_prepare(user_id, msg)
+        except LLMError as e:
+            logger.error("流式前置分析失败: %s", e)
+            yield _sse({"type": "error", "detail": str(e)})
+            return
+
+        ctx = prepared["context"]
+        analysis = prepared["analysis"]
+
+        chunks: list[str] = []
+        try:
+            async for piece in agent_stream_reply(user_id, msg, ctx):
+                chunks.append(piece)
+                yield _sse({"type": "delta", "text": piece})
+        except LLMError as e:
+            logger.error("流式生成失败: %s", e)
+            yield _sse({"type": "error", "detail": str(e)})
+            return
+
+        reply = "".join(chunks).strip()
+        if not reply:
+            yield _sse({"type": "error", "detail": "生成结果为空"})
+            return
+
+        try:
+            recommendation_id = await _finish_turn(
+                background, memory, extractor, summarizer, story_extractor,
+                user_id, msg, reply, ctx,
+            )
+        except Exception:  # noqa: BLE001  收尾失败不该吞掉已经生成的回复
+            logger.exception("流式收尾异常 user_id=%s", user_id)
+            recommendation_id = None
+
+        yield _sse({"type": "done", **_response_fields(
+            user_id, ctx, analysis, reply, recommendation_id)})
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        background=background,
+    )
+
+
+@router.post("/chat/speculate")
+async def chat_speculate(
+    req: ChatRequest,
+    account: Account = Depends(get_current_account),
+):
+    """预生成（"边说边算"）：用**部分识别结果**先把回复算起来。
+
+    前端在老人还在说话时，每隔一小段时间把"到目前为止的音频"送去识别，
+    拿到部分文本后调本接口。接口立即返回（不等待），回复在后台生成并按
+    规范化文本缓存在内存（TTL 90s，按用户隔离）。
+
+    随后的 /chat/stream 若命中缓存（最终文本与预生成文本一致，或最终文本以其
+    开头且覆盖 ≥70%），就会跳过分析与生成、直接出字；未命中则走正常链路，
+    只是白跑一次预生成——**不会影响回复质量**。
+    """
+    msg = req.message.strip()
+    if not msg:
+        raise HTTPException(status_code=400, detail="消息不能为空")
+    accepted = await speculation.speculate(account.user_id, msg)
+    return {"accepted": accepted}
