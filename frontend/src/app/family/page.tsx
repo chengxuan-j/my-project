@@ -183,6 +183,9 @@ export default function FamilyPage() {
   const [hydrated, setHydrated] = useState(false);
   // 老人实时表情（摄像头表情识别推送）：elderly_id → 最新一次识别
   const [liveEmotions, setLiveEmotions] = useState<Record<string, LiveEmotion>>({});
+  // 实时回忆推送（老人聊到往事 → SSE memoir_story）：刷新计数 + 轻提示
+  const [memoirTick, setMemoirTick] = useState(0);
+  const [memoirToast, setMemoirToast] = useState('');
 
   // 让小狗传话（仅传话，不指挥动作）
   const RELATIONS = ['女儿', '儿子', '孙女', '孙子', '外孙女', '外孙', '儿媳', '女婿'];
@@ -246,7 +249,7 @@ export default function FamilyPage() {
     }
   };
 
-  // SSE：老人发来的留言 / 回应 / 实时表情识别结果，无需手动刷新
+  // SSE：老人发来的留言 / 回应 / 实时表情识别结果 / 实时回忆，无需手动刷新
   useServerEvents(
     accessToken,
     (e) => {
@@ -271,6 +274,16 @@ export default function FamilyPage() {
             ]);
           }
         }
+        return;
+      }
+      // 老人刚聊起一段往事：已记档，刷新回忆录面板并轻提示
+      if (e.type === 'memoir_story') {
+        setMemoirTick((t) => t + 1);
+        const who = String(e.elderly_user_id ?? '') === selectedId
+          ? selectedElderlyName
+          : '老人';
+        setMemoirToast(`📖 ${who}刚聊起一段往事，已收进回忆录`);
+        window.setTimeout(() => setMemoirToast(''), 5000);
         return;
       }
       if (msgTarget) loadSent(msgTarget);
@@ -1025,9 +1038,23 @@ export default function FamilyPage() {
         </section>
       )}
 
-      {/* 选中老人的回忆录（只读 + 补照片） */}
+      {/* 选中老人的回忆录（只读 + 补照片；老人新聊往事时实时刷新） */}
       {selectedId !== null && tab === 'memoir' && (
-        <FamilyMemoirPanel elderlyId={selectedId} elderlyName={selectedElderlyName} />
+        <FamilyMemoirPanel
+          elderlyId={selectedId}
+          elderlyName={selectedElderlyName}
+          refreshKey={memoirTick}
+        />
+      )}
+
+      {/* 实时回忆轻提示（SSE memoir_story） */}
+      {memoirToast && (
+        <div
+          role="status"
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-warm-dark text-white px-5 py-3 rounded-xl shadow-lg text-base"
+        >
+          {memoirToast}
+        </div>
       )}
     </div>
   );
