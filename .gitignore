@@ -40,3 +40,17 @@ robot/xiaozhi-server/models/
 # DeepFace 库源码（pip install -e ./deepface 安装，源码一并纳入仓库；
 # 只忽略 pip 可编辑安装在本机生成的构建残留）
 /deepface/deepface.egg-info/
+
+# 本机运行数据 / 备份 / 模型缓存 / 工具产物 —— 绝不入库
+# storage/ 是运行时数据库（含老人真实对话与回忆，属私人数据）；
+# vision-control/、web-control/ 只放 MediaPipe 等模型权重；
+# web_next/ 是前端构建备份（含 node_modules）。
+# 全部用 / 开头锚定仓库根，避免误伤同名子目录。
+/storage/
+/db_backup_*/
+/vision-control/
+/web-control/
+/web_next/
+
+# Agent 工作记忆（本地协作产物，非项目代码）
+/.workbuddy/
