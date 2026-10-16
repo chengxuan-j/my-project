@@ -253,6 +253,8 @@ export interface FaceEmotionResult {
   score: number;
   scores: Record<string, number>;
   region?: { x: number; y: number; w: number; h: number } | null;
+  detector?: string;                // 命中的检测器：opencv / retinaface
+  face_confidence?: number | null;  // 人脸检测置信度 0~1
   dog_reacted: boolean;
   dog_reached: boolean;
   speech: string;
@@ -439,6 +441,27 @@ export interface FamilyPerson {
   relationship_name: string;
 }
 
+/** 每日陪伴日报 content（JSON）的结构 */
+export interface DigestStats {
+  rounds: number;
+  main_emotion: string;
+  main_emotion_label: string;
+  topics: { topic: string; count: number }[];
+  time_range: string;
+}
+/** 日报里的回忆录增量（只含老人愿意分享的条目） */
+export interface DigestMemoir {
+  today: number;
+  week: number;
+  total: number;
+}
+export interface DigestPayload {
+  date?: string;
+  summary?: string;
+  stats?: DigestStats;
+  memoir?: DigestMemoir;
+}
+
 export const familyApi = {
   list: () => api<{ elderly: ElderlyItem[] } | ElderlyItem[]>('/family/elderly'),
   bind: (elderlyUsername: string, inviteCode: string) =>
@@ -503,6 +526,18 @@ export const familyApi = {
       `/family/elderly/${elderlyId}/memoir/media/${mediaId}`,
       { method: 'DELETE' }
     ),
+  /**
+   * 立即获取今日陪伴日报（不必等每天 20:30 的定时推送）。
+   * 今天已生成过则直接返回已有内容；没有任何动静时 digest 为 null。
+   */
+  refreshDigestToday: (elderlyId: string) =>
+    api<{
+      status: string;
+      generated: boolean;
+      digest: DigestPayload | null;
+      reason?: string;
+      date?: string;
+    }>(`/family/elderly/${elderlyId}/digest/today`, { method: 'POST' }),
 };
 
 /** 老人端：与家人双向留言 */
