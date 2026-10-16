@@ -53,10 +53,21 @@ class SpeechClient:
         self.timeout = s.request_timeout
         # 语音接口实际都在 dashscope.aliyuncs.com 根域下（非 compatible-mode 前缀）
         self.speech_base = "https://dashscope.aliyuncs.com"
+        self._http: Optional[httpx.AsyncClient] = None
 
     @property
     def is_configured(self) -> bool:
         return bool(self.api_key)
+
+    def _client(self) -> httpx.AsyncClient:
+        """复用持久连接，并**直连** DashScope / OSS。
+
+        httpx 默认 trust_env=True 会读取环境里的 HTTP_PROXY，
+        把本可直连的国内请求绕进代理（实测每次多 0.7~1.2s）。
+        """
+        if self._http is None or self._http.is_closed:
+            self._http = httpx.AsyncClient(timeout=self.timeout, trust_env=False)
+        return self._http
 
     def _headers(self, extra: Optional[Dict[str, str]] = None) -> Dict[str, str]:
         h = {"Authorization": f"Bearer {self.api_key}"}
@@ -76,8 +87,9 @@ class SpeechClient:
             "input": {"text": text, "voice": voice, "format": "mp3"},
         }
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                resp = await client.post(url, json=payload, headers=self._headers())
+            resp = await self._client().post(
+                url, json=payload, headers=self._headers()
+            )
         except httpx.HTTPError as e:
             raise SpeechError(f"TTS 网络错误: {e}") from e
 
@@ -105,36 +117,36 @@ class SpeechClient:
                 ".flac": "audio/flac", ".ogg": "audio/ogg",
                 ".opus": "audio/ogg"}.get(suffix, "audio/wav")
 
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            # 1) 取上传策略
-            r = await client.get(
-                f"{self.speech_base}{UPLOAD_ENDPOINT}",
-                headers=self._headers(),
-                params={"action": "getPolicy", "model": ASR_MODEL},
+        client = self._client()
+        # 1) 取上传策略
+        r = await client.get(
+            f"{self.speech_base}{UPLOAD_ENDPOINT}",
+            headers=self._headers(),
+            params={"action": "getPolicy", "model": ASR_MODEL},
+        )
+        if r.status_code != 200:
+            raise SpeechError(
+                f"取上传策略失败: HTTP {r.status_code} {r.text[:200]}"
             )
-            if r.status_code != 200:
-                raise SpeechError(
-                    f"取上传策略失败: HTTP {r.status_code} {r.text[:200]}"
-                )
-            policy = r.json()["data"]
+        policy = r.json()["data"]
 
-            # 2) 直传 OSS
-            key = f"{policy['upload_dir']}/{uuid.uuid4().hex}{suffix}"
-            files = {
-                "OSSAccessKeyId": (None, policy["oss_access_key_id"]),
-                "Signature": (None, policy["signature"]),
-                "policy": (None, policy["policy"]),
-                "x-oss-object-acl": (None, policy["x_oss_object_acl"]),
-                "x-oss-forbid-overwrite": (None, policy["x_oss_forbid_overwrite"]),
-                "key": (None, key),
-                "success_action_status": (None, "200"),
-                "file": (f"audio{suffix}", audio_bytes, mime),
-            }
-            up = await client.post(policy["upload_host"], files=files)
-            if up.status_code != 200:
-                raise SpeechError(
-                    f"上传音频失败: HTTP {up.status_code} {up.text[:200]}"
-                )
+        # 2) 直传 OSS
+        key = f"{policy['upload_dir']}/{uuid.uuid4().hex}{suffix}"
+        files = {
+            "OSSAccessKeyId": (None, policy["oss_access_key_id"]),
+            "Signature": (None, policy["signature"]),
+            "policy": (None, policy["policy"]),
+            "x-oss-object-acl": (None, policy["x_oss_object_acl"]),
+            "x-oss-forbid-overwrite": (None, policy["x_oss_forbid_overwrite"]),
+            "key": (None, key),
+            "success_action_status": (None, "200"),
+            "file": (f"audio{suffix}", audio_bytes, mime),
+        }
+        up = await client.post(policy["upload_host"], files=files)
+        if up.status_code != 200:
+            raise SpeechError(
+                f"上传音频失败: HTTP {up.status_code} {up.text[:200]}"
+            )
         return f"oss://{key}"
 
     async def submit_transcription(self, oss_url: str) -> str:
@@ -144,13 +156,12 @@ class SpeechClient:
             "input": {"file_urls": [oss_url]},
             "parameters": {"language_hints": ["zh"]},
         }
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            r = await client.post(
-                f"{self.speech_base}{ASR_ENDPOINT}",
-                json=payload,
-                headers=self._headers({"X-DashScope-Async": "enable",
-                                       "X-DashScope-OssResourceResolve": "enable"}),
-            )
+        r = await self._client().post(
+            f"{self.speech_base}{ASR_ENDPOINT}",
+            json=payload,
+            headers=self._headers({"X-DashScope-Async": "enable",
+                                   "X-DashScope-OssResourceResolve": "enable"}),
+        )
         if r.status_code != 200:
             raise SpeechError(f"提交转写失败: HTTP {r.status_code} {r.text[:200]}")
         return r.json()["output"]["task_id"]
@@ -164,10 +175,9 @@ class SpeechClient:
         - error 仅在失败时非空
         """
         url = f"{self.speech_base}{TASKS_ENDPOINT}/{task_id}"
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            r = await client.get(
-                url, headers=self._headers({"X-DashScope-Async": "enable"}),
-            )
+        r = await self._client().get(
+            url, headers=self._headers({"X-DashScope-Async": "enable"}),
+        )
         if r.status_code != 200:
             raise SpeechError(f"查询转写任务失败: HTTP {r.status_code}")
         out = r.json().get("output", {})
@@ -177,8 +187,7 @@ class SpeechClient:
             # 结果在 results[0].transcription_url 指向的 JSON 里
             try:
                 trans_url = out["results"][0]["transcription_url"]
-                async with httpx.AsyncClient(timeout=self.timeout) as client:
-                    tr = await client.get(trans_url)
+                tr = await self._client().get(trans_url)
                 data = tr.json()
                 texts = [t["text"] for t in data.get("transcripts", [])]
                 return {"status": status, "text": "".join(texts).strip(),

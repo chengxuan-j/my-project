@@ -45,6 +45,21 @@ class QwenClient(LLMClient):
         # 情境分析等轻量任务用快模型，省一半耗时
         self.analysis_model = settings.qwen_analysis_model
         self.timeout = settings.request_timeout
+        # 持久 HTTP 连接池：复用同一个 AsyncClient，避免每次请求重建 TCP+TLS。
+        # 一轮对话有 3 次调用（情境分析 / 向量检索 / 生成回复），累计可省 0.5~1s。
+        self._clients: Dict[bool, httpx.AsyncClient] = {}
+
+    def _client(self, trust_env: bool = True) -> httpx.AsyncClient:
+        """按 trust_env 复用 httpx.AsyncClient。
+
+        默认调用方应传 trust_env=False（直连 DashScope，避免被环境代理拖慢）；
+        trust_env=True 仅在直连失败时作为回退使用。
+        """
+        c = self._clients.get(trust_env)
+        if c is None or c.is_closed:
+            c = httpx.AsyncClient(timeout=self.timeout, trust_env=trust_env)
+            self._clients[trust_env] = c
+        return c
 
     @property
     def is_configured(self) -> bool:
@@ -71,32 +86,32 @@ class QwenClient(LLMClient):
 
         logger.info("Qwen 请求 model=%s messages=%d", self.model, len(messages))
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
+            # 直连优先：DashScope 是阿里云国内服务，直连可达。
+            # 环境里若配了 HTTP_PROXY（如本机 127.0.0.1:7897），httpx 默认
+            # trust_env=True 会把国内请求也绕进代理，实测每次多 0.7~1.2s。
+            client = self._client(trust_env=False)
+            resp = await client.post(url, json=payload, headers=headers)
+            # 部分模型（如 kimi-k3）不接受 temperature 参数，会返回 400
+            # InvalidParameter；去掉该参数重试一次，避免整条链路被一个
+            # 无关参数打断（调用方无需关心具体模型支持哪些参数）。
+            if resp.status_code == 400 and "temperature" in resp.text:
+                logger.info(
+                    "模型 %s 不接受 temperature 参数，去掉后重试",
+                    payload.get("model"),
+                )
+                payload.pop("temperature", None)
                 resp = await client.post(url, json=payload, headers=headers)
-                # 部分模型（如 kimi-k3）不接受 temperature 参数，会返回 400
-                # InvalidParameter；去掉该参数重试一次，避免整条链路被一个
-                # 无关参数打断（调用方无需关心具体模型支持哪些参数）。
-                if resp.status_code == 400 and "temperature" in resp.text:
-                    logger.info(
-                        "模型 %s 不接受 temperature 参数，去掉后重试",
-                        payload.get("model"),
-                    )
-                    payload.pop("temperature", None)
-                    resp = await client.post(url, json=payload, headers=headers)
         except httpx.TimeoutException as e:
             raise LLMError(f"Qwen API 请求超时（{self.timeout}s）") from e
         except (httpx.ConnectError, httpx.ProxyError) as e:
-            # 环境里配了代理但代理进程没开（HTTPS_PROXY 指向 127.0.0.1:7897 等）时，
-            # 连接会直接失败。DashScope 是阿里云国内服务，直连可达，
-            # 这里自动绕过代理重试一次，避免代理开关状态影响 LLM 可用性。
-            logger.info("代理连接失败（%s），尝试直连", e)
+            # 直连不通时（个别网络环境必须走代理），回退到读取环境代理重试一次。
+            logger.info("DashScope 直连失败（%s），回退走环境代理", e)
             try:
-                async with httpx.AsyncClient(
-                    timeout=self.timeout, trust_env=False
-                ) as client:
-                    resp = await client.post(url, json=payload, headers=headers)
+                resp = await self._client(trust_env=True).post(
+                    url, json=payload, headers=headers
+                )
             except httpx.HTTPError as e2:
-                raise LLMError(f"Qwen API 网络错误(直连重试也失败): {e2}") from e2
+                raise LLMError(f"Qwen API 网络错误(直连与代理均失败): {e2}") from e2
         except httpx.HTTPError as e:
             raise LLMError(f"Qwen API 网络错误: {e}") from e
 
@@ -120,6 +135,71 @@ class QwenClient(LLMClient):
         )
         return content
 
+    async def chat_stream(self, messages: List[Dict[str, str]], **kwargs: Any):
+        """流式生成：逐段 yield 内容增量（用于 SSE 等"边收边渲染/边播"场景）。
+
+        与 chat() 相同的直连优先策略；直连建连失败时回退环境代理。
+        首个 token 就产出，调用方无需等整段生成完。
+        """
+        if not self.api_key:
+            raise LLMError("未配置 QWEN_API_KEY，请在 .env 中填写后重启服务。")
+
+        payload: Dict[str, Any] = {
+            "model": kwargs.get("model") or self.model,
+            "messages": messages,
+            "temperature": kwargs.get("temperature", 0.8),
+            "stream": True,
+        }
+        if "max_tokens" in kwargs:
+            payload["max_tokens"] = kwargs["max_tokens"]
+
+        url = f"{self.base_url}/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+
+        async def _iter(trust_env: bool):
+            client = self._client(trust_env=trust_env)
+            async with client.stream(
+                "POST", url, json=payload, headers=headers
+            ) as resp:
+                if resp.status_code != 200:
+                    body = await resp.aread()
+                    raise LLMError(
+                        f"Qwen API 返回 HTTP {resp.status_code}: {body[:300]!r}"
+                    )
+                async for line in resp.aiter_lines():
+                    if not line or not line.startswith("data:"):
+                        continue
+                    data = line[5:].strip()
+                    if data == "[DONE]":
+                        break
+                    try:
+                        delta = json.loads(data)["choices"][0].get("delta") or {}
+                    except (json.JSONDecodeError, KeyError, IndexError):
+                        continue
+                    piece = delta.get("content")
+                    if piece:
+                        yield piece
+
+        started = False
+        try:
+            async for piece in _iter(trust_env=False):
+                started = True
+                yield piece
+        except httpx.TimeoutException as e:
+            raise LLMError(f"Qwen 流式请求超时（{self.timeout}s）") from e
+        except (httpx.ConnectError, httpx.ProxyError) as e:
+            if started:
+                # 已经吐过内容，无法重新开始，直接报错让上层处理
+                raise LLMError(f"Qwen 流式中断: {e}") from e
+            logger.info("DashScope 直连失败（%s），回退走环境代理", e)
+            async for piece in _iter(trust_env=True):
+                yield piece
+        except httpx.HTTPError as e:
+            raise LLMError(f"Qwen 流式网络错误: {e}") from e
+
     async def embed(self, texts: List[str]) -> List[List[float]]:
         """调用 DashScope embedding API（text-embedding-v3），返回向量列表。
 
@@ -138,10 +218,20 @@ class QwenClient(LLMClient):
         payload = {"model": model, "input": texts}
 
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                resp = await client.post(url, json=payload, headers=headers)
+            # 同 chat：DashScope 直连优先，避免被环境代理拖慢
+            resp = await self._client(trust_env=False).post(
+                url, json=payload, headers=headers
+            )
         except httpx.TimeoutException as e:
             raise LLMError(f"Embedding API 请求超时（{self.timeout}s）") from e
+        except (httpx.ConnectError, httpx.ProxyError) as e:
+            logger.info("Embedding 直连失败（%s），回退走环境代理", e)
+            try:
+                resp = await self._client(trust_env=True).post(
+                    url, json=payload, headers=headers
+                )
+            except httpx.HTTPError as e2:
+                raise LLMError(f"Embedding API 网络错误(直连与代理均失败): {e2}") from e2
         except httpx.HTTPError as e:
             raise LLMError(f"Embedding API 网络错误: {e}") from e
 
