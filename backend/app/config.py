@@ -75,6 +75,11 @@ class Settings(BaseSettings):
     dog_base_url: str = "http://10.1.56.231"
     dog_timeout: float = 5.0
 
+    # ---------- 表情关怀话术（老人端表情识别 → 机器狗发声） ----------
+    # false：写死话术库轮换（默认，零延迟零成本、稳定可预期）；
+    # true：改用 Qwen 即时生成（失败自动降级写死），适合想听"新鲜话"的场景。
+    care_llm_enabled: bool = False
+
     # ---------- 每日陪伴日报推送（家属端） ----------
     # 每天把老人与陪伴助手的聊天汇总（统计 + AI 摘要）推进家属看板
     digest_enabled: bool = True

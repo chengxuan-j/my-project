@@ -6,6 +6,7 @@
 - CORS 开放给前端开发服务器（默认 http://localhost:3000）
 - 生产环境不再挂载 web/ 静态目录（前端由 Next.js 独立部署）；开发仍保留以便直接访问旧版 index.html
 """
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -44,10 +45,34 @@ async def lifespan(app: FastAPI):
     from app.scheduler.scheduler_manager import start_scheduler, stop_scheduler
     await start_scheduler()
 
+    # 4) 后台预热表情识别模型（2026-10-16）：
+    #    deepface + haar + retinaface 首次加载合计约 30~40 秒，不预热的话
+    #    老人端第一帧识别会长时间无响应。用一张无脸灰图触发：haar 无检出
+    #    → retinaface 兜底加载 → 两级 + 表情模型全部进内存。失败不影响启动。
+    asyncio.create_task(_warmup_face_emotion())
+
     yield
 
-    # 4) 停止调度器
+    # 5) 停止调度器
     await stop_scheduler()
+
+
+async def _warmup_face_emotion() -> None:
+    """后台预热表情识别（失败只记日志，绝不阻断启动）。"""
+    try:
+        import cv2
+        import numpy as np
+
+        from app.services.face_emotion import face_emotion
+
+        blank = np.full((240, 320, 3), 160, dtype=np.uint8)
+        ok, buf = cv2.imencode(".jpg", blank)
+        if not ok:
+            return
+        await face_emotion.analyze(buf.tobytes())
+        logger.info("face_emotion_warmed_up")
+    except Exception as e:  # noqa: BLE001
+        logger.warning("face_emotion_warmup_failed", error=str(e))
 
 
 def create_app() -> FastAPI:

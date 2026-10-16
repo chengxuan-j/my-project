@@ -16,6 +16,7 @@ from app.db.models import Account
 from app.memory.memory_manager import MemoryManager
 from app.repositories.profile_repo import ConversationRepo, FamilyRepo
 from app.schemas import EmotionTrendDay, FaceEmotionResponse
+from app.services import care_speech
 from app.services.dog_control import execute_actions, push_to_dog
 from app.services.face_emotion import FaceEmotionError, face_emotion, label_cn
 
@@ -28,7 +29,7 @@ ALLOWED_CONTENT_TYPES = {
     "image/jpeg", "image/png", "image/gif", "image/bmp", "image/webp",
 }
 
-# 表情 → 机器狗反应动作 + 话术（固定短语，避免每次都走 LLM 拖慢响应）。
+# 表情 → 机器狗反应动作（ESP-Hi 固件预置姿势）。
 # 触发条件：同一表情连续 2 次识别（5 秒一帧，即持续约 5 秒）。
 # neutral / surprise 不映射——平静时狗不该乱动，惊讶太瞬时容易误判。
 REACTION_ACTIONS: dict[str, str] = {
@@ -37,13 +38,6 @@ REACTION_ACTIONS: dict[str, str] = {
     "angry": "摇摆",
     "disgust": "鞠躬",
     "fear": "握手",
-}
-REACTION_SPEECH: dict[str, str] = {
-    "happy": "看到您这么开心，我也高兴，给您跳个舞！",
-    "sad": "我看您好像有点难过，我来给您摇摇尾巴，打打气！",
-    "angry": "别生气别生气，我来跳个舞，逗您开心一笑！",
-    "disgust": "心情不好吗？我给您鞠个躬，陪陪您！",
-    "fear": "别怕别怕，我在这儿陪着您呢！",
 }
 
 
@@ -87,8 +81,9 @@ async def emotion_face(
     前端老人端"表情识别"模式每 5 秒抓一帧调用本接口：
     - 识别结果叠加在摄像头画面上，同时写入 emotion_records（进情绪趋势/家属看板）；
     - 事件 face_emotion 实时推给老人本人和所有绑定家属；
-    - react=True 且同一表情持续约 5 秒（连续 2 次识别）时，
-      让机器狗做相应动作 + 说句话（开心庆祝、负面安慰）。
+    - react=True 且同一表情持续约 5 秒（连续 2 次识别）时，按 care_speech 的播报策略
+      让机器狗做相应动作 + 说一句贴合心情的关怀话（写死话术库轮换，
+      CARE_LLM_ENABLED=true 时改 LLM 生成）；neutral/surprise 按策略不播。
     """
     data = await file.read()
     if not data:
@@ -132,26 +127,42 @@ async def emotion_face(
     for family_id in await FamilyRepo(session).list_family(account.user_id):
         bus.publish(family_id, event)
 
-    # 机器狗反应：同一表情持续约 5 秒（连续 2 次识别）且过了冷却期才触发
+    # 机器狗反应：同一表情持续约 5 秒（连续 2 次识别）且过了冷却期才触发。
+    # 话术来自 care_speech（写死库轮换 / CARE_LLM_ENABLED 时 LLM 生成），
+    # 播报策略同样在 care_speech 里（neutral/surprise 不播）。
     dog_reacted = dog_reached = False
     speech = ""
-    if react and emotion in REACTION_ACTIONS and face_emotion.should_react(account.user_id):
-        action = REACTION_ACTIONS[emotion]
-        speech = REACTION_SPEECH[emotion]
-        settings = get_settings()
-        dog_reached = await execute_actions(
-            settings.dog_base_url, [(action, None)], timeout=settings.dog_timeout
+    speech_source = ""
+    if react and face_emotion.should_react(account.user_id, emotion):
+        speech, speech_source = await care_speech.pick_speech(
+            emotion, account.user_id, label_cn(emotion)
         )
-        dog_spoke = await push_to_dog(speech)
-        face_emotion.mark_reacted(account.user_id)
-        dog_reacted = True
-        logger.info(
-            "表情反应触发 user=%s emotion=%s action=%s reached=%s spoke=%s",
-            account.user_id, emotion, action, dog_reached, dog_spoke,
-        )
+        if speech:
+            action = REACTION_ACTIONS.get(emotion)
+            if action:
+                settings = get_settings()
+                dog_reached = await execute_actions(
+                    settings.dog_base_url, [(action, None)], timeout=settings.dog_timeout
+                )
+            dog_spoke = await push_to_dog(speech)
+            face_emotion.mark_reacted(account.user_id)
+            dog_reacted = True
+            logger.info(
+                "表情关怀触发 user=%s emotion=%s action=%s reached=%s spoke=%s 来源=%s 话术=%s",
+                account.user_id, emotion, action, dog_reached, dog_spoke,
+                speech_source, speech,
+            )
+        else:
+            logger.info(
+                "表情持续但按策略不播关怀话术 user=%s emotion=%s 原因=%s",
+                account.user_id, emotion,
+                care_speech.MUTE_REASONS.get(emotion, "未配置话术"),
+            )
 
     logger.info(
-        "表情识别完成 user=%s emotion=%s score=%s", account.user_id, emotion, score
+        "表情识别完成 user=%s emotion=%s score=%s detector=%s face_conf=%s",
+        account.user_id, emotion, score,
+        result.get("detector", ""), result.get("face_confidence"),
     )
     return FaceEmotionResponse(
         face_found=True,
@@ -160,6 +171,8 @@ async def emotion_face(
         score=score,
         scores=result["scores"],
         region=result["region"],
+        detector=result.get("detector", ""),
+        face_confidence=result.get("face_confidence"),
         dog_reacted=dog_reacted,
         dog_reached=dog_reached,
         speech=speech,

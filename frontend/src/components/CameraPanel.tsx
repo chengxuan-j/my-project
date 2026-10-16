@@ -53,6 +53,7 @@ export function CameraPanel({ onClose, onVoice }: CameraPanelProps) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [cameraError, setCameraError] = useState('');
+  const [camRetry, setCamRetry] = useState(0); // 点「重试」自增，触发摄像头重新初始化
 
   // 面板模式：手势指挥 / 表情识别
   const [mode, setMode] = useState<CameraMode>('gesture');
@@ -100,6 +101,17 @@ export function CameraPanel({ onClose, onVoice }: CameraPanelProps) {
     let stream: MediaStream | null = null;
 
     const startCamera = async () => {
+      // 安全上下文守卫：非 https/localhost 时浏览器直接禁用摄像头（表现为"无法访问摄像头"）
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setCameraError(
+          '当前页面不是安全上下文，浏览器禁止访问摄像头。请改用 http://localhost:3000 打开（不要用 IP 地址）'
+        );
+        setLoading(false);
+        return;
+      }
+
+      // 保留各次尝试的真实错误（此前被 catch 吞掉，只能显示 "no camera available"）
+      let lastErr: unknown = null;
       try {
         // 优先前置摄像头；台式机外接摄像头常不支持 facingMode，失败则回退到任意摄像头
         const attempts = [
@@ -110,23 +122,28 @@ export function CameraPanel({ onClose, onVoice }: CameraPanelProps) {
           try {
             stream = await navigator.mediaDevices.getUserMedia(c);
             break;
-          } catch {
-            // 尝试下一组约束
+          } catch (e) {
+            lastErr = e; // 尝试下一组约束，但记住真实原因
           }
         }
         if (!stream) {
-          throw new Error('no camera available');
+          throw lastErr ?? new Error('no camera available');
         }
         video.srcObject = stream;
         await video.play();
       } catch (err) {
-        setCameraError(
-          err instanceof Error
-            ? err.name === 'NotAllowedError'
-              ? '摄像头权限被拒绝，请在浏览器地址栏允许访问摄像头'
-              : `摄像头启动失败：${err.message}`
-            : '摄像头启动失败'
-        );
+        const name = (err as { name?: string })?.name ?? '';
+        let msg: string;
+        if (name === 'NotAllowedError' || name === 'SecurityError') {
+          msg = '摄像头权限被拒绝：点地址栏左侧的摄像头图标 → 选择「允许」，然后刷新页面';
+        } else if (name === 'NotReadableError' || name === 'AbortError') {
+          msg = '摄像头被占用或页面重载后未释放：关掉其他用摄像头的程序，或关闭本标签页重新打开';
+        } else if (name === 'NotFoundError' || name === 'OverconstrainedError') {
+          msg = '没有检测到可用摄像头，请确认设备已连接';
+        } else {
+          msg = `摄像头启动失败：${(err as Error)?.message || name || '未知原因'}`;
+        }
+        setCameraError(msg);
         setLoading(false);
       }
     };
@@ -135,7 +152,7 @@ export function CameraPanel({ onClose, onVoice }: CameraPanelProps) {
     return () => {
       stream?.getTracks().forEach((t) => t.stop());
     };
-  }, []);
+  }, [camRetry]);
 
   // 初始化 MediaPipe 并启动引擎
   useEffect(() => {
@@ -313,7 +330,22 @@ export function CameraPanel({ onClose, onVoice }: CameraPanelProps) {
     ctx.restore();
 
     const r = faceResultRef.current;
-    if (!r?.face_found || !r.region) return;
+    if (!r) return;
+    // 未检出人脸：画面上给明确提示（此前静默不画，用户会以为功能坏了）
+    if (!r.face_found) {
+      const tip = '未检测到人脸，请正对摄像头、光线亮一些';
+      const fontSize = Math.max(18, Math.round(w / 30));
+      ctx.font = `bold ${fontSize}px sans-serif`;
+      ctx.textBaseline = 'middle';
+      const tw = ctx.measureText(tip).width;
+      const cy = h - fontSize * 2.4;
+      ctx.fillStyle = 'rgba(245,158,11,0.92)';
+      ctx.fillRect((w - tw) / 2 - fontSize * 0.6, cy - fontSize * 0.8, tw + fontSize * 1.2, fontSize * 1.6);
+      ctx.fillStyle = '#fff';
+      ctx.fillText(tip, (w - tw) / 2, cy);
+      return;
+    }
+    if (!r.region) return;
 
     const s = captureScaleRef.current || 1;
     const bw = r.region.w / s;
@@ -579,12 +611,26 @@ export function CameraPanel({ onClose, onVoice }: CameraPanelProps) {
                 <p className="text-xl font-bold text-red-300 mb-2">
                   {loadError || cameraError}
                 </p>
-                <button
-                  onClick={handleClose}
-                  className="mt-4 px-6 py-3 rounded-xl bg-white text-black text-lg font-bold"
-                >
-                  返回
-                </button>
+                <div className="flex gap-3 mt-4">
+                  {cameraError && (
+                    <button
+                      onClick={() => {
+                        setCameraError('');
+                        setLoading(true);
+                        setCamRetry((n) => n + 1);
+                      }}
+                      className="px-6 py-3 rounded-xl bg-emerald-500 text-white text-lg font-bold"
+                    >
+                      重试
+                    </button>
+                  )}
+                  <button
+                    onClick={handleClose}
+                    className="px-6 py-3 rounded-xl bg-white text-black text-lg font-bold"
+                  >
+                    返回
+                  </button>
+                </div>
               </>
             )}
           </div>
