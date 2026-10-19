@@ -6,6 +6,22 @@
 - CORS 开放给前端开发服务器（默认 http://localhost:3000）
 - 生产环境不再挂载 web/ 静态目录（前端由 Next.js 独立部署）；开发仍保留以便直接访问旧版 index.html
 """
+
+# ---------- 重型 native 库预加载（2026-10-19）----------
+# ⚠️ 必须在**所有 app.* 模块之前**导入 torch，不能挪到文件后面。
+#
+# deepface 的表情模型走 PyTorch 后端（deepface.models.demography.pytorch.Emotion）。
+# 若 torch 在 app.api.* / app.db / app.services 等模块**之后**才首次导入，Windows 上
+# 会在 torch/__init__.py:496 加载 DLL 阶段直接 "access violation"，整个后端进程退出。
+# 实测：`import torch` 单独跑 5/5 成功；`import app.api.v1.router; import torch` 100% 崩；
+# 反过来 `import torch; import app.api.v1.router` 100% 成功。属导入顺序敏感的 DLL 冲突。
+# 现象特征：服务启动十几~二十几秒后无声消失，日志停在 "FaceEmotionService 模型就绪"。
+try:
+    import torch  # noqa: F401  isort:skip
+except Exception as _torch_err:  # noqa: BLE001  预加载失败不阻断启动
+    torch = None  # type: ignore[assignment]
+    print(f"[warn] torch 预加载失败，表情识别将退回懒加载: {_torch_err}", flush=True)
+
 import asyncio
 from contextlib import asynccontextmanager
 
@@ -21,6 +37,11 @@ from app.llm.qwen_client import QwenClient
 
 configure_logging()
 logger = get_logger(__name__)
+
+if torch is not None:
+    logger.info("torch_preloaded", version=torch.__version__)
+else:
+    logger.warning("torch_preload_failed")
 
 
 @asynccontextmanager
