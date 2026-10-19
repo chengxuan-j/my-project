@@ -129,7 +129,13 @@ async def generate_digest_for(
             if payload is not None:
                 return {"generated": False, "digest": payload, "date": date_str}
 
-    # 当天全部对话（时间正序）
+    # 当天全部对话（时间正序）。
+    # ⚠️ 必须排除 role='summary' 的对话压缩记录：那是系统生成的第三人称摘要，
+    # 不是老人/助手说的话。不排除会同时造成两个问题——
+    # ① 统计被污染：时段跨度把早上的压缩记录算进来，显得老人"从早聊到晚"，
+    #    实际可能只有下午聊了几句；
+    # ② 摘要输入被污染：模型看到"助手: 王奶奶今天天气好时外出散步…"这种
+    #    第三人称总结，会和原文重复且容易混淆，诱发编造。
     day_end = day_start + timedelta(days=1)
     conv_stmt = (
         select(Conversation)
@@ -137,6 +143,7 @@ async def generate_digest_for(
             Conversation.user_id == elderly_user_id,
             Conversation.created_at >= day_start,
             Conversation.created_at < day_end,
+            Conversation.role != "summary",
         )
         .order_by(Conversation.id)
     )
