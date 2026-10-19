@@ -6,6 +6,8 @@ import { chatApi, speechApi } from '@/lib/api';
 interface Props {
   onRecognized: (text: string) => void;
   onError?: (msg: string) => void;
+  /** 停止录音的瞬间触发（早于识别完成）——用于"接话"即时出声 */
+  onStopRecording?: () => void;
 }
 
 /**
@@ -15,7 +17,7 @@ interface Props {
  * /chat/speculate 让后端**提前把回复算起来**（"边说边算"）。
  * 老人停下时若最终文本与预生成文本一致，回复几乎立刻出来。
  */
-export function VoiceRecorder({ onRecognized, onError }: Props) {
+export function VoiceRecorder({ onRecognized, onError, onStopRecording }: Props) {
   const [recording, setRecording] = useState(false);
   const [processing, setProcessing] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -71,6 +73,8 @@ export function VoiceRecorder({ onRecognized, onError }: Props) {
         if (specTimerRef.current) clearInterval(specTimerRef.current);
         specTimerRef.current = null;
         stream.getTracks().forEach((t) => t.stop());
+        // 话音一落就通知外部（接话短句此时出声，不用等 ASR 那 1.5 秒）
+        onStopRecording?.();
         const blob = new Blob(chunksRef.current, { type: mr.mimeType || 'audio/webm' });
         await handleUpload(blob);
       };
