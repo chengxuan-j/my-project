@@ -83,10 +83,13 @@ class MemoryManager:
         # 长期记忆检索 + RAG 知识库：两路互不依赖，**并发执行**。
         # 实测各自 1.3~1.6s，串行会白等约 1.4s；并发后取较慢的一路。
         # 注意：topic 来自 analysis，所以必须在 analysis 之后发起。
+        # 知识库检索带上最近几轮老人原话——查询改写需要上文来消解
+        # "这个怎么办"这类指代（见 app/rag/rewrite.py 的规则门控）。
         long_memories, knowledge_results = await asyncio.gather(
             self.long.search_multi(user_id, [message, topic]),
             self.knowledge.search(
-                f"{message} {topic}".strip(), user_id=user_id, top_k=4
+                f"{message} {topic}".strip(), user_id=user_id, top_k=4,
+                history=[c for r, c in history if r == "user"][-3:],
             ),
         )
 
