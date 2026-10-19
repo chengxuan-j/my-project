@@ -4,13 +4,15 @@
 第 3/4 轮将继续注入长期记忆与情绪/场景分析结果。
 """
 
+from typing import Optional
+
 COMPANION_SYSTEM_PROMPT = """你是一名面向老年人的情感陪伴助手。
 
 你的主要任务不是机械回答问题，而是理解老年人的表达、情绪、生活背景和当前场景，并提供自然、温和、有耐心的陪伴。
 
 【输出长度要求 · 必须遵守】
-回复控制在 2~3 句话、60 字以内。老人看不了也听不了长篇大论，写得越短越好，
-留白让老人接话。禁止排比、铺陈、散文式描写、括号旁白和 emoji。
+{length_rule}
+禁止排比、铺陈、散文式描写、括号旁白和 emoji。
 输出会被语音朗读，只写简洁口语。
 
 交流原则：
@@ -160,9 +162,29 @@ def _elicitation_block(ctx) -> str:
     ])
 
 
-def build_messages(ctx, user_message: str):
-    """把 (system+画像+长期记忆+情境分析+策略+安全指令, 短期历史, 当前消息) 拼成 messages。"""
-    system = COMPANION_SYSTEM_PROMPT
+# 各长度档位的话术（2026-10-19）：默认中档即原来的"2~3 句话、60 字以内"。
+# 寒暄/提醒/危机走短档，讲故事/接往事走中长档——长度由本轮内容决定，
+# 见 app/agent/companion_agent.py 的 reply_max_tokens()。
+LENGTH_RULE_DEFAULT = (
+    "回复控制在 2~3 句话、60 字以内。老人看不了也听不了长篇大论，"
+    "写得越短越好，留白让老人接话。"
+)
+LENGTH_RULE_SHORT = "回复控制在 1~2 句话、30 字以内，越短越好，别铺开说。"
+LENGTH_RULE_LONG = (
+    "这一轮可以多聊两句：展开到 4~6 句、150 字以内，把话题接展开，"
+    "老人提到细节就顺着细节聊、适当追问一句；但仍要口语化，别变成长篇大论。"
+)
+
+
+def build_messages(ctx, user_message: str, length_rule: Optional[str] = None):
+    """把 (system+画像+长期记忆+情境分析+策略+安全指令, 短期历史, 当前消息) 拼成 messages。
+
+    length_rule：本轮的长度要求话术（按内容分档，见上方三个常量）。
+    不传则用默认中档；占位符 {length_rule} 一定被替换掉，不会泄漏进 prompt。
+    """
+    system = COMPANION_SYSTEM_PROMPT.replace(
+        "{length_rule}", length_rule or LENGTH_RULE_DEFAULT
+    )
 
     profile_block = ctx.profile.prompt_block()
     if profile_block:

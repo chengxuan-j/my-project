@@ -15,7 +15,12 @@ from langchain_core.tools import tool
 from langgraph.graph import END, START, StateGraph
 
 from app.companion.companion_policy import CompanionPolicy
-from app.companion.prompts import build_messages
+from app.companion.prompts import (
+    LENGTH_RULE_DEFAULT,
+    LENGTH_RULE_LONG,
+    LENGTH_RULE_SHORT,
+    build_messages,
+)
 from app.emotion.emotion_analyzer import AnalysisResult, EmotionAnalyzer
 from app.llm.qwen_client import QwenClient
 from app.memory.memory_manager import MemoryManager
@@ -23,9 +28,62 @@ from app.services.face_emotion import face_emotion
 
 logger = logging.getLogger(__name__)
 
-# 回复长度硬上限：约 80 中文字。老人看不了长篇，且生成耗时与长度成正比，
-# 这是整个链路最大的提速点（实测 277 字 → 80 字，生成耗时降 3 倍以上）
-MAX_REPLY_TOKENS = 150
+# 回复长度分档（token 数，中文约 1 token ≈ 0.5 字）。
+# 老人陪伴场景：功能性回应要干脆，往事/故事要能展开。
+REPLY_TOKENS_SHORT = 80    # 约 40~50 字：寒暄、提醒、执行类、危机干预
+REPLY_TOKENS_MEDIUM = 150  # 约 80 字：日常对话（原固定值）
+REPLY_TOKENS_LONG = 240    # 约 130~150 字：讲故事、接往事、回忆追问
+
+# 功能性强、要干脆的意图：说完就完，不展开
+_SHORT_INTENTS = {"greeting", "reminder", "safety_alert",
+                  "music_request", "game_request"}
+# 需要展开的意图：短了接不住、讲不透（含情感倾诉——老人在难过/孤独时
+# 更需要被好好回应，压短反而显得敷衍）
+_LONG_INTENTS = {"story_request", "memory_recall", "emotional_sharing"}
+
+
+def reply_max_tokens(message: str, context: Dict[str, Any]) -> int:
+    """按本轮内容动态决定回复长度上限（两条生成路径共用）。
+
+    原则：
+    - 功能意图（寒暄/提醒/放歌/玩游戏）走短档；讲故事、接往事、回忆追问走
+      长档；其余日常对话走中档。
+    - 风险等级 high 一律短档——危机干预时啰嗦是伤害，必须清晰短促。
+    - 强烈负面情绪（强度 ≥0.8）压回短档：人正在激动时听不进长篇。
+    - 老人这轮说了很多（>60 字）且落在中档时升一档——他说得多，
+      通常期待被认真回应，回太短会显得敷衍。
+
+    说明：长度只影响"总共生成多少"，不影响流式首字延迟（首 token 照常早出），
+    所以长档的代价只是总时长变长，不会让老人多等第一个字。
+    """
+    intent = context.get("intent", "casual_chat")
+    emotion = context.get("emotion", "neutral")
+    intensity = float(context.get("emotion_intensity") or 0.0)
+
+    # 危机：无论什么意图，一律短
+    if context.get("risk_level") == "high":
+        return REPLY_TOKENS_SHORT
+    if intent in _SHORT_INTENTS:
+        return REPLY_TOKENS_SHORT
+
+    if intent in _LONG_INTENTS or emotion == "nostalgic":
+        tokens = REPLY_TOKENS_LONG
+    else:
+        tokens = REPLY_TOKENS_MEDIUM
+
+    # 情绪正在顶点 → 压回短档。
+    # ⚠️ 只对"生气"这么做：火头上短促一句能降温，长篇容易对着怼。
+    #    难过/孤独/焦虑时**不能**压短——那正是最需要被好好回应的时候，
+    #    压短会显得敷衍（这个坑 2026-10-19 实测后发现并修正）。
+    if emotion == "angry" and intensity >= 0.8:
+        return REPLY_TOKENS_SHORT
+
+    # 老人讲了不少（>30 字，约两三句）→ 升一档：他说得多，
+    # 通常期待被认真回应，回太短会显得敷衍。（只从中档升，长档不再加）
+    if tokens == REPLY_TOKENS_MEDIUM and len((message or "").strip()) > 30:
+        tokens = REPLY_TOKENS_LONG
+
+    return tokens
 
 # 情境分析只带最近几条历史。实测把 13 条历史全塞进去，这一步会从 0.9s 涨到 2.2s；
 # 而情境判断主要依赖"当前这句话 + 少量上下文"，多塞收益低、代价高。
@@ -109,6 +167,20 @@ async def build_context(user_id: str, message: str,
     }
 
 
+def reply_length_rule(message: str, context: Dict[str, Any]) -> str:
+    """与 reply_max_tokens 同档的长度话术，注入 system prompt。
+
+    光放开 max_tokens 不够——模型天生倾向短回复，主 prompt 里又有
+    "必须遵守 60 字以内"的强约束，不换掉这句话，长档实际也只产出三五十字。
+    """
+    tokens = reply_max_tokens(message, context)
+    if tokens >= REPLY_TOKENS_LONG:
+        return LENGTH_RULE_LONG
+    if tokens <= REPLY_TOKENS_SHORT:
+        return LENGTH_RULE_SHORT
+    return LENGTH_RULE_DEFAULT
+
+
 def build_reply_messages(
     user_id: str, message: str, context: Dict[str, Any]
 ) -> List[Dict[str, str]]:
@@ -118,7 +190,8 @@ def build_reply_messages(
     避免"流式/非流式"两条路径行为分叉。
     """
     ctx = context["_ctx"]
-    messages = build_messages(ctx, message)
+    messages = build_messages(ctx, message,
+                              length_rule=reply_length_rule(message, context))
     # 摄像头表情识别结果（5 分钟内有效）作为额外情境注入，
     # 让回复语气贴合老人当下表情；没有识别记录时完全不影响原链路
     latest_face = face_emotion.latest(user_id)
@@ -133,6 +206,11 @@ def build_reply_messages(
                 "请在回复中自然照顾到这一情绪，不必点破摄像头。"
             ),
         })
+
+    # 长档场景（讲故事/接往事/回忆追问）光放开 max_tokens 不够——模型天生倾向
+    # 短回复，不提示的话长档实际也只产出三五十字，"该长时长"形同虚设。
+    # 长度话术已由 reply_length_rule() 注入主 prompt（替换其中的固定长度段），
+    # 这里不再重复追加，避免两条指令互相打架。
     return messages
 
 
@@ -152,9 +230,9 @@ async def generate_reply(user_id: str, message: str,
                 user_id, ctx.profile.name, ctx.profile.prompt_block())
     logger.info("[DEBUG] system_prompt (first 800 chars): %s",
                 messages[0]["content"][:800])
-    # max_tokens 硬上限：老人陪伴回复本就该简短，同时显著缩短生成耗时
+    # max_tokens 按本轮内容动态分档（寒暄短、故事长），见 reply_max_tokens
     return await _deps.client.chat(messages, temperature=reply_temperature(context),
-                                   max_tokens=MAX_REPLY_TOKENS)
+                                   max_tokens=reply_max_tokens(message, context))
 
 
 async def prepare(user_id: str, message: str) -> Dict[str, Any]:
@@ -181,7 +259,7 @@ async def stream_reply(user_id: str, message: str, context: Dict[str, Any]):
     messages = build_reply_messages(user_id, message, context)
     async for piece in _deps.client.chat_stream(
         messages, temperature=reply_temperature(context),
-        max_tokens=MAX_REPLY_TOKENS,
+        max_tokens=reply_max_tokens(message, context),
     ):
         yield piece
 
