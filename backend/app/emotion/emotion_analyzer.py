@@ -147,13 +147,38 @@ def parse_analysis(text: str) -> Optional[AnalysisResult]:
 
 
 class EmotionAnalyzer:
-    """第一次 Qwen 调用：情绪/意图/场景/需求/风险 一次性结构化输出。"""
+    """第一次 Qwen 调用：情绪/意图/场景/需求/风险 一次性结构化输出。
+
+    2026-10-19 增加规则前置层：简单句先用关键词规则定级（几十毫秒），
+    规则判不了才调 LLM。规则设计原则见 app/emotion/rule_analyzer.py 模块头。
+    """
 
     def __init__(self, client: Optional[QwenClient] = None) -> None:
         self.client = client or QwenClient()
 
     async def analyze(self, message: str,
                       recent: Optional[List[Tuple[str, str]]] = None) -> AnalysisResult:
+        # ---- 规则优先（零网络开销，命中即返回）----
+        from app.emotion.rule_analyzer import rule_analyze
+
+        ruled = rule_analyze(message)
+        if ruled is not None:
+            # 注意：本模块 logger 是标准 logging，不支持 structlog 的 kwargs 形式
+            logger.info(
+                "emotion_rule_hit hit=%s emotion=%s intent=%s",
+                ruled.get("rule_hit", ""), ruled["emotion"], ruled["intent"],
+            )
+            return AnalysisResult(
+                emotion=ruled["emotion"],
+                emotion_intensity=ruled["emotion_intensity"],
+                intent=ruled["intent"],
+                topic=ruled["topic"],
+                scene=ruled["scene"],
+                need=ruled["need"],
+                risk_level=ruled["risk_level"],
+                degraded=False,
+            )
+
         # 给分析器极少量历史做消歧（"他又没来"需要上文知道"他"是谁）
         context = ""
         if recent:
