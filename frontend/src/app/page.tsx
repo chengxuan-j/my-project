@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useRef, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { chatApi, dogApi, ApiError, recommendApi, familyMessageApi, FamilyMessageItem, FamilyPerson, memoirApi, MemoirStory, speechApi } from '@/lib/api';
 import { useServerEvents } from '@/lib/events';
@@ -68,6 +68,57 @@ export default function ChatPage() {
   const [lastReply, setLastReply] = useState<string | null>(null);
   // 流式路径已经逐句播过音，此时 TTSPlayer 只留"重播"按钮、不再自动播放
   const [autoSpoken, setAutoSpoken] = useState(false);
+  // 接话短句：预合成音频（public/audio/ack/），页面加载即预热，
+  // 停止录音那一刻就播，200ms 内出声（详见 playAckNow）
+  const ACK_FILES = [
+    '/audio/ack/ack_1.mp3',
+    '/audio/ack/ack_2.mp3',
+    '/audio/ack/ack_3.mp3',
+    '/audio/ack/ack_4.mp3',
+  ];
+  const ACK_MIN_GAP_MS = 5000;   // 距上次接话不足 5 秒不重复接（连发时不烦人）
+  const lastAckRef = useRef(0);
+
+  // 共享播放队列（2026-10-19）：接话与正式回复的逐句音频走同一条队列，
+  // 避免两个 Audio 同时播（叠音），也保证接话播完自动接上正式回复。
+  // 提到组件级是为了让"停止录音"（VoiceRecorder onStop）也能立即播接话，
+  // 不必等 ASR 那 1.5 秒跑完。
+  const audioQueueRef = useRef<string[]>([]);
+  const audioPlayingRef = useRef(false);
+  const drainAudioQueue = useCallback(() => {
+    const url = audioQueueRef.current.shift();
+    if (!url) {
+      audioPlayingRef.current = false;
+      return;
+    }
+    audioPlayingRef.current = true;
+    const audio = new Audio(url);
+    audio.onended = drainAudioQueue;
+    audio.onerror = drainAudioQueue;
+    audio.play().catch(() => {
+      audioPlayingRef.current = false;
+    });
+  }, []);
+  const enqueueAudio = useCallback((url: string) => {
+    audioQueueRef.current.push(url);
+    if (!audioPlayingRef.current) drainAudioQueue();
+  }, [drainAudioQueue]);
+
+  const playAckNow = useCallback(() => {
+    if (!autoTTS) return;                      // 用户关了声就不播
+    if (Date.now() - lastAckRef.current < ACK_MIN_GAP_MS) return;  // 连发不重复接
+    lastAckRef.current = Date.now();
+    const pick = ACK_FILES[Math.floor(Math.random() * ACK_FILES.length)];
+    if (pick) enqueueAudio(pick);
+  }, [autoTTS, enqueueAudio]);
+
+  useEffect(() => {
+    ACK_FILES.forEach((f) => {
+      const a = new Audio(f);
+      a.preload = 'auto';
+    });
+  }, []);
+
   const [recommendation, setRecommendation] = useState<Recommendation | null>(null);
   const [recPool, setRecPool] = useState<RecommendItem[]>([]);
   const [recOffset, setRecOffset] = useState(0);
@@ -204,27 +255,12 @@ export default function ChatPage() {
     ]);
     setInput('');
     setSending(true);
+    // 文字发送也接一句（语音路径已在停止录音时接过了，5 秒内不会重复）
+    playAckNow();
 
     let acc = '';        // 累积的完整回复
     let spoken = 0;      // 已送去合成的字符下标（按句切分）
     let spokeAnything = false;
-    const queue: string[] = [];   // 待播音频 URL 队列
-    let playing = false;
-
-    const playNext = () => {
-      const url = queue.shift();
-      if (!url) {
-        playing = false;
-        return;
-      }
-      playing = true;
-      const audio = new Audio(url);
-      audio.onended = playNext;
-      audio.onerror = playNext;
-      audio.play().catch(() => {
-        playing = false;
-      });
-    };
 
     // 每凑齐若干句就**逐句**合成并排队播放：第一句一好就出声，
     // 不必等整段生成完再合成（首句出声因此明显提前）
@@ -235,8 +271,7 @@ export default function ChatPage() {
         .tts(sentence)
         .then((r) => {
           if (!r.audio_url) return;
-          queue.push(r.audio_url);
-          if (!playing) playNext();
+          enqueueAudio(r.audio_url);
         })
         .catch(() => {
           // 单句合成失败不影响后续句子
@@ -810,6 +845,7 @@ export default function ChatPage() {
           <VoiceRecorder
             onRecognized={(text) => sendMessage(text)}
             onError={(msg) => setError(msg)}
+            onStopRecording={playAckNow}
           />
           <span className="text-xs text-gray-500">按住说话</span>
         </div>
