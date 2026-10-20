@@ -68,21 +68,10 @@ export default function ChatPage() {
   const [lastReply, setLastReply] = useState<string | null>(null);
   // 流式路径已经逐句播过音，此时 TTSPlayer 只留"重播"按钮、不再自动播放
   const [autoSpoken, setAutoSpoken] = useState(false);
-  // 接话短句：预合成音频（public/audio/ack/），页面加载即预热，
-  // 停止录音那一刻就播，200ms 内出声（详见 playAckNow）
-  const ACK_FILES = [
-    '/audio/ack/ack_1.mp3',
-    '/audio/ack/ack_2.mp3',
-    '/audio/ack/ack_3.mp3',
-    '/audio/ack/ack_4.mp3',
-  ];
-  const ACK_MIN_GAP_MS = 5000;   // 距上次接话不足 5 秒不重复接（连发时不烦人）
-  const lastAckRef = useRef(0);
 
-  // 共享播放队列（2026-10-19）：接话与正式回复的逐句音频走同一条队列，
-  // 避免两个 Audio 同时播（叠音），也保证接话播完自动接上正式回复。
-  // 提到组件级是为了让"停止录音"（VoiceRecorder onStop）也能立即播接话，
-  // 不必等 ASR 那 1.5 秒跑完。
+  // 共享播放队列：正式回复的逐句音频排队播出，避免两句叠在一起。
+  // （2026-10-20 移除"接话短句"——AI 回答前那句预合成的"嗯，我在呢"
+  //   听感生硬，用户要求去掉。队列本身保留，按句 TTS 仍在用。）
   const audioQueueRef = useRef<string[]>([]);
   const audioPlayingRef = useRef(false);
   const drainAudioQueue = useCallback(() => {
@@ -103,21 +92,6 @@ export default function ChatPage() {
     audioQueueRef.current.push(url);
     if (!audioPlayingRef.current) drainAudioQueue();
   }, [drainAudioQueue]);
-
-  const playAckNow = useCallback(() => {
-    if (!autoTTS) return;                      // 用户关了声就不播
-    if (Date.now() - lastAckRef.current < ACK_MIN_GAP_MS) return;  // 连发不重复接
-    lastAckRef.current = Date.now();
-    const pick = ACK_FILES[Math.floor(Math.random() * ACK_FILES.length)];
-    if (pick) enqueueAudio(pick);
-  }, [autoTTS, enqueueAudio]);
-
-  useEffect(() => {
-    ACK_FILES.forEach((f) => {
-      const a = new Audio(f);
-      a.preload = 'auto';
-    });
-  }, []);
 
   const [recommendation, setRecommendation] = useState<Recommendation | null>(null);
   const [recPool, setRecPool] = useState<RecommendItem[]>([]);
@@ -255,8 +229,6 @@ export default function ChatPage() {
     ]);
     setInput('');
     setSending(true);
-    // 文字发送也接一句（语音路径已在停止录音时接过了，5 秒内不会重复）
-    playAckNow();
 
     let acc = '';        // 累积的完整回复
     let spoken = 0;      // 已送去合成的字符下标（按句切分）
@@ -845,7 +817,6 @@ export default function ChatPage() {
           <VoiceRecorder
             onRecognized={(text) => sendMessage(text)}
             onError={(msg) => setError(msg)}
-            onStopRecording={playAckNow}
           />
           <span className="text-xs text-gray-500">按住说话</span>
         </div>
