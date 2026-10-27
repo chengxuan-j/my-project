@@ -41,7 +41,13 @@ async def build_book(session: AsyncSession, elderly_id: str) -> Dict[str, Any]:
             LifeStory.emotion_tone,
             LifeStory.completeness,
         )
-        .where(LifeStory.elderly_user_id == elderly_id)
+        # 只把老人**确认留档**的故事装订成书：
+        # draft / pending_confirm 还只是素材，留在「回忆录」里继续打磨；
+        # 这样「人生之书（成品）」和「回忆录（素材库）」不会看起来是同一份东西。
+        .where(
+            LifeStory.elderly_user_id == elderly_id,
+            LifeStory.status == "archived",
+        )
         .order_by(LifeStory.id.asc())
         .limit(200)
     )

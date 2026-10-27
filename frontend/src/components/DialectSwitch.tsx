@@ -142,8 +142,8 @@ export function DialectSwitch() {
 
             <div className="px-5 pb-5">
               <p className="text-sm text-gray-500 leading-relaxed">
-                打字时用方言词，AI 能看懂；说话时语音识别按普通话模型走，
-                口音太重可能识别不准，重要的事建议打字或说慢一点。
+                选好方言后：说话按方言识别（四川话、粤语、上海话等），
+                回复也用方言腔念出来。口音特别重时可以说慢一点。
               </p>
             </div>
           </div>

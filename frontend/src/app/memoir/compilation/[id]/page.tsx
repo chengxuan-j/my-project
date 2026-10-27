@@ -53,7 +53,7 @@ export default function CompilationPage() {
     if (!comp) return;
     try {
       await memoirApi.deleteCompilation(comp.id);
-      router.push('/memoir');
+      router.push('/book?tab=memoir');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '删除失败');
     }
@@ -64,7 +64,7 @@ export default function CompilationPage() {
   return (
     <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <Link href="/memoir" className="text-warm-primary min-h-[48px] flex items-center">
+        <Link href="/book?tab=memoir" className="text-warm-primary min-h-[48px] flex items-center">
           ← 回到回忆录
         </Link>
         {comp && (

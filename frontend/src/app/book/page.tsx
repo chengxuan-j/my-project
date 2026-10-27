@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { bookApi, LifeBook } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth';
+import { MemoirWorkbench } from '@/components/MemoirWorkbench';
 
 const TONE_STAMP: Record<string, { ring: string; text: string; label: string }> = {
   amber: { ring: 'border-amber-400 text-amber-700', text: 'text-amber-800', label: '暖' },
@@ -11,12 +12,20 @@ const TONE_STAMP: Record<string, { ring: string; text: string; label: string }> 
   gray: { ring: 'border-gray-300 text-gray-500', text: 'text-gray-700', label: '淡' },
 };
 
-/** 老人端「人生之书」：回忆录按人生阶段排版成一本可打印的书。 */
+/** 老人端「人生之书」：成书 + 素材库（原回忆录合并进来）。 */
 export default function BookPage() {
   const { accessToken } = useAuthStore();
   const [book, setBook] = useState<LifeBook | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [tab, setTab] = useState<'book' | 'memoir'>('book');
+
+  // 旧地址 /memoir 会跳到 /book?tab=memoir
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('tab') === 'memoir') {
+      setTab('memoir');
+    }
+  }, []);
 
   useEffect(() => {
     if (!accessToken) return;
@@ -27,25 +36,65 @@ export default function BookPage() {
       .finally(() => setLoading(false));
   }, [accessToken]);
 
+  const tabs = (
+    <div className="no-print flex items-center justify-between gap-3 flex-wrap">
+      <div className="inline-flex rounded-full bg-warm-light p-1 gap-1">
+        <button
+          type="button"
+          onClick={() => setTab('book')}
+          className={`min-h-[44px] px-5 rounded-full font-bold ${
+            tab === 'book' ? 'bg-white text-warm-dark shadow-sm' : 'text-gray-600'
+          }`}
+        >
+          📗 成书
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab('memoir')}
+          className={`min-h-[44px] px-5 rounded-full font-bold ${
+            tab === 'memoir' ? 'bg-white text-warm-dark shadow-sm' : 'text-gray-600'
+          }`}
+        >
+          📖 素材库
+        </button>
+      </div>
+      <p className="text-xs text-gray-500">素材库里确认留档的故事，才会装订进书里</p>
+    </div>
+  );
+
+  if (tab === 'memoir') {
+    return (
+      <div className="max-w-5xl mx-auto px-4 py-6 space-y-4">
+        {tabs}
+        <MemoirWorkbench embedded />
+      </div>
+    );
+  }
+
   if (loading) {
     return (
-      <div className="max-w-3xl mx-auto px-4 py-12 text-center text-gray-500 text-lg">
-        正在装订你的人生之书…
+      <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+        {tabs}
+        <p className="py-10 text-center text-gray-500 text-lg">正在装订你的人生之书…</p>
       </div>
     );
   }
 
   if (error || !book) {
     return (
-      <div className="max-w-3xl mx-auto px-4 py-12 text-center text-gray-500">
-        <p className="text-lg">这本书还没装订好</p>
-        <p className="text-sm mt-2">{error || '稍后再试试'}</p>
+      <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+        {tabs}
+        <div className="py-10 text-center text-gray-500">
+          <p className="text-lg">这本书还没装订好</p>
+          <p className="text-sm mt-2">{error || '稍后再试试'}</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+      {tabs}
       <style>{`
         @media print {
           header { display: none !important; }
@@ -73,6 +122,9 @@ export default function BookPage() {
         <p className="text-sm text-gray-500 mt-2">
           全书 {book.chapter_count} 章 · 收录 {book.story_count} 段人生回忆
         </p>
+        <p className="no-print text-xs text-amber-700/70 mt-3">
+          只收录在「回忆录」里确认留档的故事；还没确认的素材不会进书。
+        </p>
         <div className="no-print mt-8 flex justify-center gap-3 flex-wrap">
           <button
             type="button"
@@ -95,14 +147,23 @@ export default function BookPage() {
         <section className="bg-white rounded-2xl border-2 border-warm-light p-10 text-center">
           <p className="text-lg text-gray-600">这本书还是空白的。</p>
           <p className="text-gray-500 mt-2">
-            多和 AI 聊聊过去的事，聊得够了，这里就会一章一章长出来。
+            书只收录你<strong>确认留档</strong>的故事。去「回忆录」把讲过的往事留下来，
+            这里就会一章一章长出来。
           </p>
-          <Link
-            href="/"
-            className="no-print inline-flex items-center min-h-[48px] px-5 mt-4 rounded-xl bg-warm-primary text-white font-bold"
-          >
-            💬 去聊会儿天
-          </Link>
+          <div className="no-print mt-4 flex justify-center gap-3 flex-wrap">
+            <Link
+              href="/book?tab=memoir"
+              className="inline-flex items-center min-h-[48px] px-5 rounded-xl bg-warm-primary text-white font-bold"
+            >
+              📖 去素材库看看
+            </Link>
+            <Link
+              href="/"
+              className="inline-flex items-center min-h-[48px] px-5 rounded-xl bg-white border-2 border-warm-light text-gray-700 font-bold"
+            >
+              💬 去聊会儿天
+            </Link>
+          </div>
         </section>
       ) : (
         book.chapters.map((chapter, ci) => (

@@ -220,13 +220,31 @@ GROWTH_MONTHS = 6
 
 
 def era_stage_of(era_tags: Optional[List[str]], time_value: str = "") -> str:
-    """回忆落入哪个人生阶段：先看 era_tags，再看 time_value 文本。"""
+    """回忆落入哪个人生阶段：先看 era_tags，再看 time_value 文本。
+
+    文本里只有年份（如「1985年」）时按历史年代兜底，
+    否则会统一掉进「近年时光」——1985 年进厂的故事不该出现在近年。
+    """
     tags = list(era_tags or []) + [time_value or ""]
     for stage, keywords in ERA_STAGES:
         if not keywords:
             continue
         if any(k in t for t in tags for k in keywords if k in t):
             return stage
+
+    match = re.search(r"(19\d{2}|20\d{2})", time_value or "")
+    if match:
+        year = int(match.group(1))
+        if year < 1950:
+            return "童年时光"
+        if year < 1966:
+            return "票证年代"
+        if year < 1978:
+            return "知青年代"
+        if year < 1993:
+            return "改革开放初期"
+        if year < 2006:
+            return "下岗改制"
     return ERA_STAGES[-1][0]
 
 
@@ -276,7 +294,12 @@ async def build_journey(
             LifeStory.completeness,
             LifeStory.visibility,
         )
-        .where(LifeStory.elderly_user_id == elderly_id)
+        # 只统计**已留档**的故事：草稿/待确认还在回忆录里打磨，
+        # 弃用的故事也不该出现在人生河上。这样河里的数量和《人生之书》一致。
+        .where(
+            LifeStory.elderly_user_id == elderly_id,
+            LifeStory.status == "archived",
+        )
         .order_by(LifeStory.id.asc())
         .limit(200)
     )

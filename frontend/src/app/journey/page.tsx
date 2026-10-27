@@ -52,7 +52,10 @@ export default function JourneyPage() {
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-amber-600">你的人生，值得被记住</p>
           <h1 className="text-3xl font-bold text-gray-900 mt-1">🌊 {name}的人生河</h1>
-          <p className="text-gray-500 mt-1">这里只给你自己看：AI 有多懂你，以及你走过的路。</p>
+          <p className="text-gray-500 mt-1">
+            这一页看的是「变化」：AI 对你的理解、这些年的心情起伏。
+            完整故事在《人生之书》里读。
+          </p>
         </div>
         <Link
           href="/book"

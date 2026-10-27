@@ -44,8 +44,9 @@ _RISK_WORDS = (
 # ---------- 情绪 ----------
 # (关键词, emotion, intensity)；intensity 表示该词自带的情绪强度
 _EMOTION_WORDS: Tuple[Tuple[Tuple[str, ...], str, float], ...] = (
-    (("开心", "高兴", "快乐", "欢喜", "舒畅", "舒坦", "幸福", "满意", "庆幸", "热闹"), "happy", 0.7),
-    (("难过", "伤心", "心酸", "想哭", "哭了一场", "委屈", "掉泪"), "sad", 0.7),
+    (("开心", "高兴", "快乐", "欢喜", "舒畅", "舒坦", "幸福", "满意", "庆幸", "热闹",
+      "不错", "挺好", "还好", "舒服", "惬意", "顺心"), "happy", 0.6),
+    (("难过", "伤心", "心酸", "想哭", "哭了一场", "委屈", "掉泪", "难受", "心里难受"), "sad", 0.7),
     (("孤单", "孤独", "冷清", "没人陪", "没人理", "一个人闷"), "lonely", 0.7),
     (("无聊", "闷得慌", "没事干", "闲着"), "bored", 0.6),
     (("担心", "不安", "心事", "放不下", "惦记", "忧虑", "害怕", "心慌"), "anxious", 0.7),
@@ -74,7 +75,7 @@ _REQUEST_WORDS: Tuple[Tuple[Tuple[str, ...], str], ...] = (
     (("玩游戏", "下棋", "打牌", "猜谜", "玩个游戏"), "game_request"),
     (("你还记得", "你记得吗", "还记得我", "我说过什么", "昨天问你"), "memory_recall"),
     (("该吃药", "提醒我", "几点了", "别忘了"), "reminder"),
-    (("身体", "血压", "血糖", "吃药", "失眠", "便秘", "头晕", "哪儿疼", "不舒服", "看病"), "health_concern"),
+    (("身体", "血压", "血糖", "吃药", "失眠", "睡不着", "睡不好", "便秘", "头晕", "哪儿疼", "不舒服", "看病"), "health_concern"),
     (("女儿", "儿子", "老伴", "儿媳妇", "女婿", "孙子", "家人", "孩子他"), "family_talk"),
     (("怎么办", "该不该", "好不好", "能不能"), "advice_request"),
 )
@@ -90,6 +91,30 @@ _TOPIC_WORDS: Tuple[Tuple[str, ...], ...] = (
     ("花钱", "退休金", "工资", "养老金"),
     ("猫", "狗", "鸟", "花", "养草"),
 )
+
+
+# 纯寒暄：整句只有问候，没有别的内容。
+# 这类句子不需要 LLM 判 topic/scene，直接给 greeting 能省 0.7~0.9s，
+# 是老人最高频的一句话（"你好/在吗/早上好"）。
+_GREETING_RE = re.compile(
+    r"^(你好|您好|嗨|哈喽|hello|在吗|在么|早上好|上午好|中午好|下午好|晚上好|我回来了)"
+    r"[呀啊呢哈啦~！!。.，,\s]*(在吗|在么)?[呀啊呢哈啦~！!。.，,\s]*$",
+    re.I,
+)
+
+# 可以安全地按"平常闲聊"处理的 topic（不含身体/家人/钱，避免把关心误判成闲聊）
+_SAFE_CASUAL_TOPICS: Tuple[str, ...] = (
+    "天气", "下雨", "下雪", "气温", "太阳", "风大", "降温",
+    "看电视", "听戏", "听广播", "刷手机", "散步", "遛弯", "跳舞",
+    "养花", "花", "猫", "狗", "鸟", "买菜", "做饭",
+)
+
+
+def _safe_topic(text: str) -> str:
+    for w in _SAFE_CASUAL_TOPICS:
+        if w in text:
+            return w
+    return ""
 
 
 def _has_negation(text: str, word: str) -> bool:
@@ -120,6 +145,14 @@ def rule_analyze(message: str) -> Optional[dict]:
                 risk="high", hit=f"risk:{w}",
             )
 
+    # --- 纯寒暄：整句只有问候，直接给结果，不等 LLM ---
+    if _GREETING_RE.match(text):
+        return _result(
+            emotion="neutral", intensity=0.0, intent="greeting",
+            topic="", scene="conversation", need="companionship",
+            risk="low", hit="greeting",
+        )
+
     # --- 其余维度：必须先确认没有否定歧义 ---
     hits = []  # (维度, 命中词, 值)
 
@@ -141,8 +174,17 @@ def rule_analyze(message: str) -> Optional[dict]:
                 hits.append(("intent", w, intent))
                 break
 
-    # 没有任何明确信号 → 交给 LLM（纯寒暄也交给 LLM，因为需要 topic/scene）
+    # 没有任何明确信号时：短句 + 安全话题（天气/电视/散步）按平常闲聊处理，
+    # 不再为了一个 topic 去等 LLM；带否定词或超长句仍然交给 LLM。
     if not hits:
+        if len(text) <= 20 and not any(n in text for n in _NEGATIONS):
+            topic = _safe_topic(text)
+            if topic:
+                return _result(
+                    emotion="neutral", intensity=0.0, intent="casual_chat",
+                    topic=topic, scene="conversation", need="companionship",
+                    risk="low", hit=f"topic:{topic}",
+                )
         return None
 
     emotion, intensity = "neutral", 0.0

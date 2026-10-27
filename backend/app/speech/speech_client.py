@@ -21,6 +21,8 @@ from app.config import get_settings
 logger = logging.getLogger(__name__)
 
 TTS_ENDPOINT = "/api/v1/services/audio/tts/SpeechSynthesizer"
+# 方言音色走多模态生成接口（qwen3-tts 系列），和上面那个老接口不是同一个地址
+TTS_DIALECT_ENDPOINT = "/api/v1/services/aigc/multimodal-generation/generation"
 ASR_ENDPOINT = "/api/v1/services/audio/asr/transcription"
 UPLOAD_ENDPOINT = "/api/v1/uploads"
 TASKS_ENDPOINT = "/api/v1/tasks"
@@ -54,6 +56,13 @@ class SpeechClient:
         # 语音接口实际都在 dashscope.aliyuncs.com 根域下（非 compatible-mode 前缀）
         self.speech_base = "https://dashscope.aliyuncs.com"
         self._http: Optional[httpx.AsyncClient] = None
+        # 语音模型可配置：fun-asr 才支持方言，paraformer-v2 只做普通话兜底
+        self.asr_model = s.asr_model or ASR_MODEL
+        self.asr_fallback_model = s.asr_fallback_model or "paraformer-v2"
+        self.tts_model = s.tts_model or TTS_MODEL
+        # 方言音色只能配 qwen3-tts 系列，不能和上面的 tts_model 混用
+        self.tts_dialect_model = s.tts_dialect_model or "qwen3-tts-flash"
+        self.tts_voice = s.tts_voice or DEFAULT_VOICE
 
     @property
     def is_configured(self) -> bool:
@@ -77,14 +86,31 @@ class SpeechClient:
 
     # ---------------- TTS ----------------
 
-    async def synthesize(self, text: str, voice: str = DEFAULT_VOICE) -> str:
-        """文字转语音，返回音频 URL。"""
+    async def synthesize(
+        self,
+        text: str,
+        voice: Optional[str] = None,
+        instruction: Optional[str] = None,
+    ) -> str:
+        """文字转语音（普通话音色），返回音频 URL。
+
+        instruction 用自然语言控制语气，但**实测对模型无效**：
+        传「请用英文说这句」出来的仍然是中文，所以不要再指望它切方言，
+        方言请走 synthesize_dialect（靠专用音色）。
+        """
         if not self.api_key:
             raise SpeechError("未配置 QWEN_API_KEY，无法调用语音合成。")
         url = f"{self.speech_base}{TTS_ENDPOINT}"
+        input_payload: Dict[str, Any] = {
+            "text": text,
+            "voice": voice or self.tts_voice,
+            "format": "mp3",
+        }
+        if instruction:
+            input_payload["instruction"] = instruction
         payload = {
-            "model": TTS_MODEL,
-            "input": {"text": text, "voice": voice, "format": "mp3"},
+            "model": self.tts_model,
+            "input": input_payload,
         }
         try:
             resp = await self._client().post(
@@ -99,17 +125,56 @@ class SpeechClient:
             audio_url = resp.json()["output"]["audio"]["url"]
         except (json.JSONDecodeError, KeyError) as e:
             raise SpeechError(f"TTS 响应结构异常: {resp.text[:200]}") from e
-        logger.info("TTS 合成成功（%d 字）", len(text))
+        logger.info(
+            "TTS 合成成功（%d 字，dialect_instruction=%s）",
+            len(text), bool(instruction),
+        )
+        return audio_url
+
+    async def synthesize_dialect(self, text: str, voice: str) -> str:
+        """用**方言专用音色**合成，返回音频 URL。
+
+        qwen3-tts 的方言靠音色而不是指令：Sunny/Eric=四川，Kiki/Rocky=粤语，
+        Jada=上海，Marcus=陕西…（见 app/companion/dialects.py 的映射）。
+        这条走的是多模态生成接口，和老接口不是同一个 URL。
+        """
+        if not self.api_key:
+            raise SpeechError("未配置 QWEN_API_KEY，无法调用语音合成。")
+        payload = {
+            "model": self.tts_dialect_model,
+            "input": {"text": text, "voice": voice},
+        }
+        try:
+            resp = await self._client().post(
+                f"{self.speech_base}{TTS_DIALECT_ENDPOINT}",
+                json=payload,
+                headers=self._headers(),
+            )
+        except httpx.HTTPError as e:
+            raise SpeechError(f"方言 TTS 网络错误: {e}") from e
+        if resp.status_code != 200:
+            raise SpeechError(
+                f"方言 TTS 返回 HTTP {resp.status_code}: {resp.text[:200]}"
+            )
+        try:
+            audio_url = resp.json()["output"]["audio"]["url"]
+        except (json.JSONDecodeError, KeyError) as e:
+            raise SpeechError(f"方言 TTS 响应结构异常: {resp.text[:200]}") from e
+        logger.info("方言 TTS 合成成功（%d 字，voice=%s）", len(text), voice)
         return audio_url
 
     # ---------------- ASR ----------------
 
-    async def upload_audio(self, audio_bytes: bytes, filename: str) -> str:
+    async def upload_audio(
+        self, audio_bytes: bytes, filename: str, model: Optional[str] = None
+    ) -> str:
         """上传音频到 DashScope 临时 OSS，返回 oss:// URL。
 
         OSS key 的后缀会被服务端用于判断音频格式，必须与 filename 真实后缀一致，
         不能写死成 .wav（否则 webm 会被当成 wav 解析而失败）。
+        model 省略时用默认 ASR 模型；普通话可传 paraformer-v2 更快。
         """
+        asr_model = model or self.asr_model
         suffix = os.path.splitext(filename or "")[1].lower()
         if suffix not in (".wav", ".mp3", ".m4a", ".aac", ".flac", ".ogg", ".opus"):
             suffix = ".wav"
@@ -122,8 +187,18 @@ class SpeechClient:
         r = await client.get(
             f"{self.speech_base}{UPLOAD_ENDPOINT}",
             headers=self._headers(),
-            params={"action": "getPolicy", "model": ASR_MODEL},
+            params={"action": "getPolicy", "model": asr_model},
         )
+        if r.status_code != 200 and asr_model != self.asr_fallback_model:
+            logger.warning(
+                "取上传策略失败（model=%s），回退 %s 重试: HTTP %s",
+                asr_model, self.asr_fallback_model, r.status_code,
+            )
+            r = await client.get(
+                f"{self.speech_base}{UPLOAD_ENDPOINT}",
+                headers=self._headers(),
+                params={"action": "getPolicy", "model": self.asr_fallback_model},
+            )
         if r.status_code != 200:
             raise SpeechError(
                 f"取上传策略失败: HTTP {r.status_code} {r.text[:200]}"
@@ -149,19 +224,44 @@ class SpeechClient:
             )
         return f"oss://{key}"
 
-    async def submit_transcription(self, oss_url: str) -> str:
-        """提交 ASR 转写任务，立即返回 task_id（非阻塞）。"""
-        payload = {
-            "model": ASR_MODEL,
-            "input": {"file_urls": [oss_url]},
-            "parameters": {"language_hints": ["zh"]},
-        }
-        r = await self._client().post(
-            f"{self.speech_base}{ASR_ENDPOINT}",
-            json=payload,
-            headers=self._headers({"X-DashScope-Async": "enable",
-                                   "X-DashScope-OssResourceResolve": "enable"}),
-        )
+    async def submit_transcription(
+        self, oss_url: str, model: Optional[str] = None
+    ) -> str:
+        """提交 ASR 转写任务，立即返回 task_id（非阻塞）。
+
+        默认用 fun-asr：它原生支持官话/吴/湘/赣/客/闽/粤七大方言，
+        老人说四川话、粤语、上海话都能转写，不需要前端指定方言。
+        普通话（未开方言）可传 paraformer-v2，速度更快、价格更低。
+        模型不可用时回退 paraformer-v2，保证基本可用。
+        """
+        primary = model or self.asr_model
+        async def _submit(model: str) -> httpx.Response:
+            payload: Dict[str, Any] = {
+                "model": model,
+                "input": {"file_urls": [oss_url]},
+            }
+            # paraformer 才需要语言提示；fun-asr 传空参数让它自动判方言
+            if not model.startswith("fun-asr"):
+                payload["parameters"] = {"language_hints": ["zh"]}
+            return await self._client().post(
+                f"{self.speech_base}{ASR_ENDPOINT}",
+                json=payload,
+                headers=self._headers({"X-DashScope-Async": "enable",
+                                       "X-DashScope-OssResourceResolve": "enable"}),
+            )
+
+        r = await _submit(primary)
+        if r.status_code == 400 and primary != self.asr_fallback_model:
+            code = ""
+            try:
+                body = r.json()
+                code = str(body.get("code") or (body.get("error") or {}).get("code") or "")
+            except Exception:  # noqa: BLE001
+                pass
+            if code in ("InvalidParameter", "ModelNotFound", "UnsupportedModel"):
+                logger.warning("ASR 模型 %s 不可用，回退 %s", primary,
+                               self.asr_fallback_model)
+                r = await _submit(self.asr_fallback_model)
         if r.status_code != 200:
             raise SpeechError(f"提交转写失败: HTTP {r.status_code} {r.text[:200]}")
         return r.json()["output"]["task_id"]

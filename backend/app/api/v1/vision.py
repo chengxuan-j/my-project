@@ -17,6 +17,7 @@ from app.config import get_settings
 from app.core.dependencies import get_current_account
 from app.db.models import Account
 from app.llm.qwen_client import LLMError, QwenClient
+from app.llm.qwen_vision import describe_image
 from app.schemas import VisionDescribeResponse, VisionReactResponse
 from app.services.dog_control import ACTION_MAP, execute_actions, normalize_actions
 
@@ -60,8 +61,20 @@ async def _read_image(file: UploadFile) -> tuple[bytes, str]:
     return data, content_type or "image/jpeg"
 
 
+async def _describe_via_qwen(data: bytes, content_type: str, question: str) -> str:
+    """云端兜底：小智视觉服务没起时直接用 Qwen-VL 理解图片。"""
+    try:
+        return await describe_image(data, question, content_type or "image/jpeg")
+    except LLMError as e:
+        logger.error("Qwen-VL 兜底也失败: %s", e)
+        raise HTTPException(status_code=502, detail=f"视觉服务不可用：{e}")
+
+
 async def _describe_via_xiaozhi(data: bytes, filename: str, content_type: str, question: str) -> str:
-    """把照片发给小智 MCP Vision，返回中文描述文本。"""
+    """把照片发给小智 MCP Vision，返回中文描述文本。
+
+    小智服务不可达/返回异常时自动回退 Qwen-VL，保证"拍照看看"单人也能用。
+    """
     settings = get_settings()
 
     # 小智 MCP Vision 协议：multipart 字段顺序为 question → 图片文件；
@@ -83,25 +96,24 @@ async def _describe_via_xiaozhi(data: bytes, filename: str, content_type: str, q
                 files={"file": (filename, data, content_type)},
             )
     except httpx.HTTPError as e:
-        logger.error("小智视觉服务不可达 url=%s: %s", settings.xiaozhi_vision_url, e)
-        raise HTTPException(
-            status_code=502, detail="视觉服务暂时连不上，请确认小智服务端已启动"
-        )
+        logger.warning("小智视觉不可达（%s），回退 Qwen-VL", e)
+        return await _describe_via_qwen(data, content_type, question)
 
     try:
         payload = resp.json()
     except ValueError:
-        logger.error("小智视觉服务返回非 JSON: %s", resp.text[:200])
-        raise HTTPException(status_code=502, detail="视觉服务返回异常")
+        logger.warning("小智视觉返回非 JSON（%s），回退 Qwen-VL", resp.text[:120])
+        return await _describe_via_qwen(data, content_type, question)
 
     if resp.status_code != 200 or not payload.get("success"):
         msg = payload.get("message") or "视觉分析失败"
-        logger.error("小智视觉分析失败 status=%s: %s", resp.status_code, msg)
-        raise HTTPException(status_code=502, detail=f"视觉分析失败：{msg}")
+        logger.warning("小智视觉失败 status=%s: %s，回退 Qwen-VL", resp.status_code, msg)
+        return await _describe_via_qwen(data, content_type, question)
 
     description = str(payload.get("response") or "").strip()
     if not description:
-        raise HTTPException(status_code=502, detail="视觉服务没有返回描述")
+        logger.warning("小智视觉没有返回描述，回退 Qwen-VL")
+        return await _describe_via_qwen(data, content_type, question)
     return description
 
 

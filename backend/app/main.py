@@ -99,6 +99,27 @@ async def _warmup_llm() -> None:
         await client.chat(
             [{"role": "user", "content": "你好"}], temperature=0.0, max_tokens=1
         )
+        # 寒暄用的快模型也热一下：不热的话第一条"你好"会付模型冷启动 ~1s
+        fast_model = get_settings().qwen_fast_model
+        if fast_model and fast_model != client.model:
+            await client.chat(
+                [{"role": "user", "content": "你好"}], temperature=0.0,
+                max_tokens=1, model=fast_model,
+            )
+        # 流式接口和普通 chat 是不同的服务端路径，必须单独热一次，
+        # 否则第一条真实回复仍会多等 ~1.2s。
+        stream_models = [None]
+        if fast_model and fast_model != client.model:
+            stream_models.append(fast_model)
+        for m in stream_models:
+            try:
+                async for _ in client.chat_stream(
+                    [{"role": "user", "content": "你好"}],
+                    temperature=0.0, max_tokens=1, model=m,
+                ):
+                    break
+            except Exception as e:  # noqa: BLE001
+                logger.warning("stream_warmup_failed model=%s: %s", m, e)
         await client.embed(["预热"])
         logger.info("llm_connections_warmed_up")
     except Exception as e:  # noqa: BLE001  预热失败不影响启动
@@ -120,7 +141,18 @@ async def _warmup_llm() -> None:
                 )
             ).scalar_one_or_none()
         if uid:
-            await companion_agent.prepare(uid, "你好")
+            # 用一句会触发知识库检索的话预热：寒暄现在走规则快判、不查知识库，
+            # 如果还拿"你好"预热，第一次真实检索仍要付 BM25/jieba 的冷启动 ~0.5-1s。
+            await companion_agent.prepare(uid, "我最近晚上睡不好，怎么办")
+            # 再用真实的寒暄上下文跑一次流式生成（只取首个 chunk，不保存），
+            # 把"长 prompt + qwen-flash 流式"这条精确路径也热掉；
+            # 否则重启后的头两条"你好"仍会各多等 ~1s。
+            try:
+                greet = await companion_agent.prepare(uid, "你好")
+                async for _ in companion_agent.stream_reply(uid, "你好", greet["context"]):
+                    break
+            except Exception as e:  # noqa: BLE001
+                logger.warning("greet_stream_warmup_failed", error=str(e))
             logger.info("agent_pipeline_warmed_up")
     except Exception as e:  # noqa: BLE001
         logger.warning("agent_warmup_failed", error=str(e))

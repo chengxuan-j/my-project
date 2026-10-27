@@ -3,6 +3,7 @@ import './globals.css';
 import { SettingsProvider } from '@/components/SettingsProvider';
 import { NavBar } from '@/components/NavBar';
 import { CareAlertModal } from '@/components/CareAlertModal';
+import { LetterArrivalModal } from '@/components/LetterArrivalModal';
 
 // 全站为客户端交互应用（登录态存 localStorage），
 // 禁止静态预渲染被长期缓存，避免发版后客户端仍加载旧页面/旧 chunk。
@@ -32,6 +33,7 @@ export default function RootLayout({
         <SettingsProvider>
           <NavBar />
           <CareAlertModal />
+          <LetterArrivalModal />
           <main className="pb-8">{children}</main>
           <ServiceWorkerRegister />
         </SettingsProvider>

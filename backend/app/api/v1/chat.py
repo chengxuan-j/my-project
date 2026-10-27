@@ -1,4 +1,5 @@
 """聊天路由（带 JWT 认证）。user_id 从 token 取，不再接受客户端传入。"""
+import asyncio
 import json
 import logging
 import time
@@ -148,6 +149,23 @@ async def _finalize_memoir(
         logger.exception("回忆录收尾异常 user_id=%s", user_id)
 
 
+async def _delayed_extract(memory, extractor, user_id, msg, reply) -> None:
+    """延迟几秒再抽记忆：让老人紧接着说的下一句优先走 Qwen，不和后台抢配额。"""
+    await asyncio.sleep(5)
+    try:
+        await _extract_and_save(memory, extractor, user_id, msg, reply)
+    except Exception:  # noqa: BLE001
+        logger.exception("延迟记忆抽取失败 user_id=%s", user_id)
+
+
+async def _delayed_story(story_extractor, user_id, msg, reply) -> None:
+    await asyncio.sleep(7)
+    try:
+        await _extract_and_save_story(story_extractor, user_id, msg, reply)
+    except Exception:  # noqa: BLE001
+        logger.exception("延迟故事抽取失败 user_id=%s", user_id)
+
+
 async def _finish_turn(
     background: BackgroundTasks,
     memory: MemoryManager,
@@ -177,10 +195,13 @@ async def _finish_turn(
             )
 
     if ctx["risk_level"] != "high":
-        background.add_task(_extract_and_save, memory, extractor, user_id, msg, reply)
+        # 寒暄没有可记的事实，直接跳过，省一次 LLM；其余延迟几秒再抽，
+        # 避免老人紧接着说下一句时，后台任务和正式回复抢 Qwen。
+        if ctx.get("intent") != "greeting":
+            background.add_task(_delayed_extract, memory, extractor, user_id, msg, reply)
         # 回忆录：实时回忆模式（关键词命中即记档并推送家属，MEMOIR_ENABLED 可关）
         if settings.memoir_enabled:
-            background.add_task(_extract_and_save_story, story_extractor, user_id, msg, reply)
+            background.add_task(_delayed_story, story_extractor, user_id, msg, reply)
 
     # 检查是否需要压缩对话历史
     if memory.should_compress_conversation(user_id):

@@ -15,6 +15,7 @@ from langchain_core.tools import tool
 from langgraph.graph import END, START, StateGraph
 
 from app.companion.companion_policy import CompanionPolicy
+from app.config import get_settings
 from app.companion.prompts import (
     LENGTH_RULE_DEFAULT,
     LENGTH_RULE_LONG,
@@ -232,6 +233,23 @@ def reply_temperature(context: Dict[str, Any]) -> float:
     return 0.5 if context["_ctx"].risk_level == "high" else 0.8
 
 
+# 只用快模型的意图：寒暄/短闲聊。情绪倾诉、故事、健康、风险仍走 qwen-plus。
+_FAST_REPLY_INTENTS = {"greeting", "casual_chat"}
+
+
+def reply_model(context: Dict[str, Any]) -> Optional[str]:
+    """寒暄/闲聊用 qwen-flash（首字快约 0.7s），其余返回 None 用默认模型。"""
+    try:
+        ctx = context["_ctx"]
+        if ctx.risk_level == "high":
+            return None
+        if ctx.intent in _FAST_REPLY_INTENTS:
+            return get_settings().qwen_fast_model or None
+    except Exception:  # noqa: BLE001  模型选择失败不能影响回复
+        pass
+    return None
+
+
 @tool
 async def generate_reply(user_id: str, message: str,
                          context: Dict[str, Any]) -> str:
@@ -245,6 +263,7 @@ async def generate_reply(user_id: str, message: str,
                 messages[0]["content"][:800])
     # max_tokens 按本轮内容动态分档（寒暄短、故事长），见 reply_max_tokens
     return await _deps.client.chat(messages, temperature=reply_temperature(context),
+                                   model=reply_model(context),
                                    max_tokens=reply_max_tokens(message, context))
 
 
@@ -281,6 +300,7 @@ async def stream_reply(user_id: str, message: str, context: Dict[str, Any]):
     messages = build_reply_messages(user_id, message, context)
     async for piece in _deps.client.chat_stream(
         messages, temperature=reply_temperature(context),
+        model=reply_model(context),
         max_tokens=reply_max_tokens(message, context),
     ):
         yield piece

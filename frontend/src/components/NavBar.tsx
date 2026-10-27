@@ -12,11 +12,11 @@ import { useCareStore } from '@/stores/care';
 
 const NAV_ITEMS_ELDERLY = [
   { href: '/', label: '💬 聊天' },
+  { href: '/call', label: '📞 通话' },
   { href: '/care', label: '❤️ 关怀' },
   { href: '/letters', label: '💌 信笺' },
   { href: '/journey', label: '🌊 人生河' },
   { href: '/book', label: '📗 人生之书' },
-  { href: '/memoir', label: '📖 回忆录' },
   { href: '/profile', label: '👤 我的' },
   { href: '/account', label: '⚙ 账号' },
 ];

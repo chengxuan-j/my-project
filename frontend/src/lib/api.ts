@@ -456,6 +456,23 @@ export const speechApi = {
     api<{ task_id: string; status: string; text?: string; error?: string }>(
       `/speech/asr/${taskId}`
     ),
+
+  /**
+   * 一次性转写：上传音频 → 直接返回文字（服务端合并了上传/提交/轮询）。
+   *
+   * 语音通话一轮一答，自己 submit + 轮询会多出 3~6 次往返，
+   * 这条接口把"说完到看见字"的等待压低。
+   * dialect 传空则跟随账号的方言设置；传「普通话」强制走普通话模型。
+   */
+  transcribe: (file: Blob, dialect?: string, filename = 'call.webm') => {
+    const fd = new FormData();
+    fd.append('file', file, filename);
+    if (dialect) fd.append('dialect', dialect);
+    return api<{ text: string; dialect: string; model: string; elapsed_ms: number }>(
+      '/speech/asr/transcribe',
+      { method: 'POST', formData: fd }
+    );
+  },
 };
 
 /** 视觉：拍照 → 小智视觉服务描述（桥接 xiaozhi-esp32-server） */
@@ -1330,6 +1347,8 @@ export interface DialectOption {
   name: string;
   enabled: boolean;
   style: string;
+  /** 有没有原生方言音色；false = 只有方言用词，播报仍是普通话 */
+  has_voice?: boolean;
 }
 
 export interface DialectState {

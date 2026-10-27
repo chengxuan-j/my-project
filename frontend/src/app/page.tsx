@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { chatApi, dogApi, ApiError, recommendApi, familyMessageApi, FamilyMessageItem, FamilyPerson, memoirApi, MemoirStory, speechApi } from '@/lib/api';
 import { useServerEvents } from '@/lib/events';
 import { useAuthStore } from '@/stores/auth';
@@ -819,6 +820,13 @@ export default function ChatPage() {
             onError={(msg) => setError(msg)}
           />
           <span className="text-xs text-gray-500">按住说话</span>
+          <Link
+            href="/call"
+            className="text-xs font-bold text-warm-dark hover:text-warm-primary underline"
+            title="进入语音通话：像打电话一样聊天，可以说方言"
+          >
+            📞 打电话
+          </Link>
         </div>
         <LargeButton type="submit" size="lg" disabled={sending || !input.trim()}>
           发送

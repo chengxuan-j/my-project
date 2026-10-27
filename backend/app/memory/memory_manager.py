@@ -92,7 +92,11 @@ class MemoryManager:
         # 寒暄不查知识库：一句"你好/在吗"去检索既没有可用的资料，
         # 又白花一次 embedding（冷启动时能到 2.6s）。省掉这一步，
         # 老人打招呼时首个字能早出来约 0.3~2.5s。
-        need_knowledge = not (intent == "greeting" and len(message.strip()) <= 10)
+        # 寒暄/短闲聊不查知识库：一句"你好""今天天气不错"既没有可查的资料，
+        # 又白花一次 embedding。省掉后首字能早 0.1~0.4s（冷启动更多）。
+        need_knowledge = not (
+            intent in ("greeting", "casual_chat") and len(message.strip()) <= 20
+        )
         long_memories, knowledge_results = await asyncio.gather(
             self.long.search_multi(user_id, [message, topic]),
             self.knowledge.search(

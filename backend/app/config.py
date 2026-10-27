@@ -39,9 +39,26 @@ class Settings(BaseSettings):
     # 推理模型（如 kimi-k3）会把 token 全耗在思维链上、content 返回空，导致分析降级
     # 且单步耗时 10s+（2026-10-16 实测 kimi-k3 11.19s vs qwen-flash 2.01s，同句对比）。
     qwen_analysis_model: str = "qwen-flash"
+    # 图像理解兜底：小智视觉服务没起、或本地表情模型缺依赖时用它
+    # 注意 qwen-vl-plus 已下线（model_not_found），当前可用的是 qwen3-vl-plus
+    qwen_vision_model: str = "qwen3-vl-plus"
+    # 寒暄/短闲聊用快模型：实测首字 qwen-flash 0.32s vs qwen-plus 1.03s；
+    # 情绪倾诉/故事/健康等仍走 qwen-plus，不为速度牺牲共情质量。
+    qwen_fast_model: str = "qwen-flash"
     embedding_model: str = "text-embedding-v3"
     # 兼容旧环境变量名 QWEN_TIMEOUT
     request_timeout: float = Field(default=60.0, validation_alias="QWEN_TIMEOUT")
+
+    # ---------- 语音（ASR / TTS） ----------
+    # fun-asr 支持普通话 + 七大方言（官话/吴/湘/赣/客/闽/粤），
+    # 是"老人说方言"能被听懂的关键；paraformer-v2 只适合普通话。
+    asr_model: str = "fun-asr"
+    asr_fallback_model: str = "paraformer-v2"
+    tts_model: str = "qwen-audio-3.0-tts-flash"
+    tts_voice: str = "longanhuan_v3.6"
+    # 方言音色必须配 qwen3-tts 系列（Sunny=四川、Kiki=粤语…），
+    # 老的 longanhuan 音色在它上面会报 InvalidVoice。
+    tts_dialect_model: str = "qwen3-tts-flash"
 
     # ---------- 数据库 ----------
     # 开发默认 SQLite（aiosqlite），生产切 postgresql+asyncpg://...

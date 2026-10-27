@@ -12,10 +12,15 @@
   供机器狗"表情持续 5 秒才反应"的触发和聊天 Agent 上下文共用。
 """
 import asyncio
+import json
 import logging
+import re
 import time
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
+
+from app.llm.qwen_client import LLMError
+from app.llm.qwen_vision import describe_image
 
 logger = logging.getLogger(__name__)
 
@@ -93,13 +98,70 @@ class FaceEmotionService:
 
         返回 dict（emotion/score/region/scores/face_confidence）；
         图中没有人脸时返回 None；依赖缺失 / 解码失败抛 FaceEmotionError。
+
+        本地 DeepFace 缺 cv2/torch 时自动回退 Qwen-VL（qwen3-vl-plus），
+        这样没装重依赖的机器也能用摄像头表情。
         """
         async with self._lock:
-            return await asyncio.to_thread(self._analyze_sync, image_bytes)
+            try:
+                return await asyncio.to_thread(self._analyze_sync, image_bytes)
+            except FaceEmotionError as e:
+                if isinstance(e.__cause__, ImportError):
+                    logger.warning("本地表情模型缺依赖，回退 Qwen-VL: %s", e)
+                    return await self._analyze_via_vlm(image_bytes)
+                raise
+
+    async def _analyze_via_vlm(self, image_bytes: bytes) -> Optional[Dict[str, Any]]:
+        """云端兜底：让 Qwen-VL 判断人脸主要表情，输出与 DeepFace 同构的 dict。"""
+        prompt = (
+            "你是面部表情识别器。看这张照片：\n"
+            "- 如果有清晰人脸，判断主要表情，只输出 JSON："
+            '{"face_found": true, "emotion": "happy", "score": 85}\n'
+            "- emotion 只能是 angry、disgust、fear、happy、sad、surprise、neutral 之一\n"
+            "- score 是 0~100 的置信度\n"
+            '- 没有清晰人脸时输出 {"face_found": false}\n'
+            "只输出 JSON，不要解释。"
+        )
+        try:
+            text = await describe_image(image_bytes, prompt, max_tokens=120)
+        except LLMError as e:
+            raise FaceEmotionError(f"表情识别暂不可用：{e}") from e
+
+        text = re.sub(r"^```(?:json)?|```$", "", text.strip(), flags=re.M).strip()
+        match = re.search(r"\{.*\}", text, flags=re.S)
+        if not match:
+            logger.warning("Qwen-VL 表情返回无法解析: %s", text[:120])
+            return None
+        try:
+            data = json.loads(match.group(0))
+        except json.JSONDecodeError:
+            logger.warning("Qwen-VL 表情 JSON 解析失败: %s", text[:120])
+            return None
+
+        if not data.get("face_found"):
+            return None
+        emotion = str(data.get("emotion") or "neutral").lower()
+        if emotion not in EMOTION_LABEL_CN:
+            emotion = "neutral"
+        try:
+            score = max(0.0, min(100.0, float(data.get("score") or 60)))
+        except (TypeError, ValueError):
+            score = 60.0
+        return {
+            "emotion": emotion,
+            "score": round(score, 1),
+            "scores": {},
+            "region": None,
+            "face_confidence": None,
+            "detector": "qwen-vl",
+        }
 
     def _analyze_sync(self, image_bytes: bytes) -> Optional[Dict[str, Any]]:
-        import cv2
-        import numpy as np
+        try:
+            import cv2
+            import numpy as np
+        except ImportError as e:
+            raise FaceEmotionError("本地表情识别缺少 opencv/numpy") from e
 
         arr = np.frombuffer(image_bytes, dtype=np.uint8)
         img = cv2.imdecode(arr, cv2.IMREAD_COLOR)

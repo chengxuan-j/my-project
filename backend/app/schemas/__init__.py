@@ -144,6 +144,18 @@ class ASRResultResponse(BaseModel):
     error: Optional[str] = None
 
 
+class ASRTranscribeResponse(BaseModel):
+    """一次请求拿到识别结果（内部合并了上传 / 提交 / 轮询）。
+
+    供「语音通话」这种一轮一答的场景用，省掉前端 submit + 轮询 N 次的往返。
+    """
+
+    text: str
+    dialect: str = ""
+    model: str = ""
+    elapsed_ms: int = 0
+
+
 # ---------- Vision ----------
 
 class VisionDescribeResponse(BaseModel):
