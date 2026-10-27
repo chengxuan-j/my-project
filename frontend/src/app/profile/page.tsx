@@ -62,6 +62,10 @@ export default function ProfilePage() {
     try {
       const updated = await profileApi.update(profile);
       setProfile(updated);
+      // 名字可能改了：同步到全局会话，导航栏/聊天头部立即生效
+      if (typeof updated.name === 'string' && updated.name.trim()) {
+        useAuthStore.getState().updateUserName(updated.name.trim());
+      }
       setMessage('✅ 保存成功！');
       setTimeout(() => setMessage(''), 3000);
     } catch (err) {

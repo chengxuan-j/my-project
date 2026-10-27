@@ -6,6 +6,8 @@
 
 from typing import Optional
 
+from app.companion.dialects import dialect_instruction
+
 COMPANION_SYSTEM_PROMPT = """你是一名面向老年人的情感陪伴助手。
 
 你的主要任务不是机械回答问题，而是理解老年人的表达、情绪、生活背景和当前场景，并提供自然、温和、有耐心的陪伴。
@@ -116,6 +118,49 @@ def _policy_block(ctx) -> str:
     return "\n".join(lines)
 
 
+def _dialect_block(ctx) -> str:
+    """方言模式：开关打开且选了具体方言时，整段回复改用方言口语。
+
+    长度与安全约束不受影响——`COMPANION_SYSTEM_PROMPT` 已经写了，这里只加
+    "用哪种话说"，避免方言模式把危机干预也带跑。
+    """
+    prefs = getattr(ctx.profile, "conversation_preferences", None) or {}
+    if not prefs.get("dialect_mode"):
+        return ""
+    return dialect_instruction(getattr(ctx.profile, "dialect", "") or "")
+
+
+def _health_block(ctx) -> str:
+    """把"未确认的吃药/复诊"告诉模型，但明确不许变成催命。
+
+    老人设提醒是为了自己安心，不是为了被 AI 追着念。所以：
+    - 只在相关话题（问今天做什么、聊身体、聊吃药）时自然带一句；
+    - 一次只说最要紧的一条；
+    - 绝不替老人确认"吃过了"。
+    """
+    due = getattr(ctx, "health_due", None) or []
+    if not due:
+        return ""
+    lines = ["【今天的健康提醒（老人自己设的）】"]
+    for item in due[:5]:
+        when = item.get("scheduled_for", "")
+        clock = when[11:16] if len(when) >= 16 else when
+        overdue = int(item.get("overdue_minutes") or 0)
+        label = "吃药" if item.get("kind") == "medication" else "复诊"
+        detail = item.get("detail") or ""
+        suffix = f"，已经过了 {overdue} 分钟" if overdue > 0 else ""
+        lines.append(
+            f"- {clock} {label}：{item.get('title', '')}"
+            + (f"（{detail}）" if detail else "") + suffix
+        )
+    lines += [
+        "- 他问起今天要做什么、或者正在聊身体/吃药时，挑最要紧的一条自然提一句。",
+        "- 他正在说别的、情绪不好时，先接住情绪，别硬插提醒。",
+        "- 一次只说一条，不要念清单；也不要替他说\"已经吃过了\"。",
+    ]
+    return "\n".join(lines)
+
+
 def _long_memory_block(ctx) -> str:
     if not getattr(ctx, "long_memories", None):
         return ""
@@ -191,6 +236,10 @@ def build_messages(ctx, user_message: str, length_rule: Optional[str] = None):
         system += "\n\n【老人画像】\n" + profile_block + \
                   "\n（以上信息是该老人在注册时主动填写的真实信息，你可以在对话中直接引用，比如称呼对方的名字、提及兴趣爱好等。不要说'我不知道你的名字'这类话。）"
 
+    dialect_block = _dialect_block(ctx)
+    if dialect_block:
+        system += "\n\n" + dialect_block
+
     mem_block = _long_memory_block(ctx)
     if mem_block:
         system += "\n\n" + mem_block
@@ -202,6 +251,10 @@ def build_messages(ctx, user_message: str, length_rule: Optional[str] = None):
     state_block = _state_block(ctx)
     if state_block:
         system += "\n\n" + state_block
+
+    health_block = _health_block(ctx)
+    if health_block:
+        system += "\n\n" + health_block
 
     policy_block = _policy_block(ctx)
     if policy_block:

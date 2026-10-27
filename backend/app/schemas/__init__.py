@@ -41,6 +41,7 @@ class TokenResponse(BaseModel):
     elderly_id: Optional[str] = None   # 家属绑定的第一个老人（如果有）
     invite_code: Optional[str] = None  # 老人专属：注册时返回，便于展示给家属
     email: Optional[str] = None
+    name: Optional[str] = None         # 老人显示称呼（画像 name）；家属为 None
 
 
 class RefreshRequest(BaseModel):
@@ -53,6 +54,21 @@ class CurrentUserResponse(BaseModel):
     role: str
     elderly_id: Optional[str] = None
     email: Optional[str] = None
+    name: Optional[str] = None
+
+
+class NameUpdateRequest(BaseModel):
+    """修改老人显示称呼（不影响登录用户名）。"""
+    name: str = Field(..., min_length=1, max_length=20)
+
+
+class UsernameUpdateRequest(BaseModel):
+    """修改登录用户名：必须验证当前密码，规则与注册一致。"""
+    username: str = Field(
+        ..., min_length=3, max_length=64,
+        pattern=r"^[A-Za-z0-9_\-\u4e00-\u9fff]+$",
+    )
+    password: str = Field(..., min_length=1, max_length=128)
 
 
 # ---------- Chat ----------

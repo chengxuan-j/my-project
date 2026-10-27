@@ -2,16 +2,23 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { familyApi, dogApi, ApiError, ElderlyItem, EmotionRecord, MemoryItem, FamilyAlert, EmotionTrendDay, FamilyMessageItem, familyMessageApi, DigestPayload } from '@/lib/api';
+import { familyApi, dogApi, ApiError, ElderlyItem, EmotionRecord, MemoryItem, FamilyAlert, EmotionTrendDay, FamilyMessageItem, familyMessageApi, DigestPayload, ChatRhythm, CareIndex, MemoryGraph, MemoirPipelineData, CareSignals, DogLog } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth';
 import { useServerEvents } from '@/lib/events';
 import { LargeButton } from '@/components/LargeButton';
 import { EmotionChart, EMOTION_LABEL } from '@/components/EmotionChart';
 import { EmotionTrendChart } from '@/components/EmotionTrendChart';
 import { EmotionInsights } from '@/components/EmotionInsights';
+import { ChatRhythmHeatmap } from '@/components/ChatRhythmHeatmap';
+import { CareIndexGauge } from '@/components/CareIndexGauge';
+import { CareSignalPanel } from '@/components/CareSignalPanel';
+import { DogLogPanel } from '@/components/DogLogPanel';
 import { MemoryList } from '@/components/MemoryList';
+import { MemoryThemeGraph } from '@/components/MemoryThemeGraph';
+import { MemoirPipeline } from '@/components/MemoirPipeline';
 import { PersonNetwork } from '@/components/PersonNetwork';
 import { FamilyMemoirPanel } from '@/components/FamilyMemoirPanel';
+import { FamilyCarePanel } from '@/components/FamilyCarePanel';
 import { extractPersons } from '@/lib/personExtract';
 
 const MSG_CATEGORIES = [
@@ -143,6 +150,12 @@ export default function FamilyPage() {
   const [memories, setMemories] = useState<MemoryItem[]>([]);
   const [trend, setTrend] = useState<EmotionTrendDay[]>([]);
   const [days, setDays] = useState<7 | 30>(7);
+  const [rhythm, setRhythm] = useState<ChatRhythm | null>(null);
+  const [careIndex, setCareIndex] = useState<CareIndex | null>(null);
+  const [memoryGraph, setMemoryGraph] = useState<MemoryGraph | null>(null);
+  const [memoirPipeline, setMemoirPipeline] = useState<MemoirPipelineData | null>(null);
+  const [careSignals, setCareSignals] = useState<CareSignals | null>(null);
+  const [dogLog, setDogLog] = useState<DogLog | null>(null);
   const [alerts, setAlerts] = useState<FamilyAlert[]>([]);
   const [msgTarget, setMsgTarget] = useState<string>('');
   const [msgContent, setMsgContent] = useState('');
@@ -153,7 +166,7 @@ export default function FamilyPage() {
   const [ackingId, setAckingId] = useState<number | null>(null);
   const [alertElderly, setAlertElderly] = useState<string>('all');
   const [selectedPerson, setSelectedPerson] = useState<string | null>(null);
-  const [tab, setTab] = useState<'emotion' | 'memories' | 'memoir'>('emotion');
+  const [tab, setTab] = useState<'emotion' | 'memories' | 'memoir' | 'care'>('emotion');
   const [bindUsername, setBindUsername] = useState('');
   const [inviteCode, setInviteCode] = useState('');
   const [error, setError] = useState('');
@@ -212,6 +225,12 @@ export default function FamilyPage() {
       setSentMsgs([]);
       setInboxMsgs([]);
     }
+    // 小狗跑腿记录：失败静默（不影响留言主数据）
+    try {
+      setDogLog(await familyApi.dogLog(elderlyId));
+    } catch {
+      setDogLog(null);
+    }
   };
 
   const loadList = async () => {
@@ -268,6 +287,10 @@ export default function FamilyPage() {
       // 老人刚聊起一段往事：已记档，刷新回忆录面板并轻提示
       if (e.type === 'memoir_story') {
         setMemoirTick((t) => t + 1);
+        // 流水线计数跟着刷新（私密条目仍不会出现在计数里）
+        if (selectedId) {
+          familyApi.memoirPipeline(selectedId).then(setMemoirPipeline).catch(() => {});
+        }
         const who = String(e.elderly_user_id ?? '') === selectedId
           ? selectedElderlyName
           : '老人';
@@ -329,6 +352,23 @@ export default function FamilyPage() {
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '加载情绪记录失败');
     }
+    // 关怀指数 + 对话节律：与情绪同批加载，失败静默（不阻塞主数据）
+    try {
+      setCareIndex(await familyApi.careIndex(elderlyId));
+    } catch {
+      setCareIndex(null);
+    }
+    try {
+      setRhythm(await familyApi.chatRhythm(elderlyId, 28));
+    } catch {
+      setRhythm(null);
+    }
+    // 陪伴需求信号：失败静默
+    try {
+      setCareSignals(await familyApi.careSignals(elderlyId));
+    } catch {
+      setCareSignals(null);
+    }
   };
 
   const handleViewMemories = async (elderlyId: string) => {
@@ -341,6 +381,12 @@ export default function FamilyPage() {
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '加载记忆失败');
     }
+    // 记忆主题图谱：与记忆同批加载，失败静默
+    try {
+      setMemoryGraph(await familyApi.memoryGraph(elderlyId));
+    } catch {
+      setMemoryGraph(null);
+    }
   };
 
   // 回忆录是只读的（外加补照片），数据在面板内部自取，这里只切 tab
@@ -348,6 +394,15 @@ export default function FamilyPage() {
     setSelectedId(elderlyId);
     setSelectedPerson(null);
     setTab('memoir');
+    // 流水线透视图：只统计家属可见条目，失败静默
+    familyApi.memoirPipeline(elderlyId).then(setMemoirPipeline).catch(() => setMemoirPipeline(null));
+  };
+
+  // 健康关怀 + 时光信笺：只读，数据由面板内部自取（含权限过滤）
+  const handleViewCare = (elderlyId: string) => {
+    setSelectedId(elderlyId);
+    setSelectedPerson(null);
+    setTab('care');
   };
 
   const loadTrend = async (elderlyId: string, d: 7 | 30) => {
@@ -750,6 +805,12 @@ export default function FamilyPage() {
                   >
                     📖 回忆录
                   </LargeButton>
+                  <LargeButton
+                    variant={selectedId === e.elderly_id && tab === 'care' ? 'primary' : 'secondary'}
+                    onClick={() => handleViewCare(e.elderly_id)}
+                  >
+                    ❤️ 关怀
+                  </LargeButton>
                 </div>
               </li>
             ))}
@@ -999,6 +1060,7 @@ export default function FamilyPage() {
               </div>
             )}
           </form>
+          <DogLogPanel log={dogLog} />
         </section>
       )}
 
@@ -1077,9 +1139,12 @@ export default function FamilyPage() {
               ))}
             </div>
           </div>
+          <CareIndexGauge care={careIndex} />
+          <CareSignalPanel signals={careSignals} />
           <EmotionTrendChart trend={trend} />
           <EmotionInsights records={records} />
           <EmotionChart records={records} />
+          <ChatRhythmHeatmap rhythm={rhythm} />
           <div className="bg-white rounded-2xl shadow-sm border-2 border-warm-light p-6">
             {records.length === 0 ? (
               <p className="text-gray-500">暂无情绪记录</p>
@@ -1115,6 +1180,7 @@ export default function FamilyPage() {
           <h2 className="text-xl font-bold text-gray-900">
             🧠 {selectedElderlyName} 的记忆
           </h2>
+          <MemoryThemeGraph graph={memoryGraph} />
           <PersonNetwork
             persons={persons}
             centerLabel={selectedElderlyName}
@@ -1134,13 +1200,21 @@ export default function FamilyPage() {
         </section>
       )}
 
+      {/* 选中老人的健康关怀与时光信笺（只读） */}
+      {selectedId !== null && tab === 'care' && (
+        <FamilyCarePanel elderlyId={selectedId} elderlyName={selectedElderlyName} />
+      )}
+
       {/* 选中老人的回忆录（只读 + 补照片；老人新聊往事时实时刷新） */}
       {selectedId !== null && tab === 'memoir' && (
-        <FamilyMemoirPanel
-          elderlyId={selectedId}
-          elderlyName={selectedElderlyName}
-          refreshKey={memoirTick}
-        />
+        <>
+          <MemoirPipeline pipeline={memoirPipeline} />
+          <FamilyMemoirPanel
+            elderlyId={selectedId}
+            elderlyName={selectedElderlyName}
+            refreshKey={memoirTick}
+          />
+        </>
       )}
 
       {/* 实时回忆轻提示（SSE memoir_story） */}

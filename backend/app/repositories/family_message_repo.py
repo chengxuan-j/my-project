@@ -43,6 +43,23 @@ class FamilyMessageRepo:
         await self.session.flush()
         return msg.id
 
+    async def count_between(self, elderly_user_id: str, since: datetime) -> int:
+        """某时间点之后与该老人的双向留言总数（不含系统日报）。
+
+        日报（category='digest'）是系统以老人名义推给家属的陪伴报告，
+        不算「家人互动」，否则每天一条日报会把联结因子刷满。
+        """
+        stmt = (
+            select(func.count())
+            .select_from(FamilyMessage)
+            .where(
+                FamilyMessage.elderly_user_id == elderly_user_id,
+                FamilyMessage.created_at >= since,
+                FamilyMessage.category != "digest",
+            )
+        )
+        return int((await self.session.execute(stmt)).scalar_one())
+
     async def list_for_elderly(
         self, elderly_user_id: str, limit: int = 50
     ) -> List[FamilyMessage]:
@@ -99,6 +116,25 @@ class FamilyMessageRepo:
                 FamilyMessage.family_user_id == family_user_id,
                 FamilyMessage.elderly_user_id == elderly_user_id,
                 FamilyMessage.sender_role == "elderly",
+            )
+            .order_by(FamilyMessage.created_at.desc(), FamilyMessage.id.desc())
+            .limit(limit)
+        )
+        return list((await self.session.execute(stmt)).scalars().all())
+
+    async def list_dog_relays(
+        self, elderly_user_id: str, limit: int = 50
+    ) -> List[FamilyMessage]:
+        """小狗传话记录（category='dog_relay'，家属→老人），按时间倒序。
+
+        陪伴日志用：只读 category 与已读状态，不涉及其它留言类型。
+        """
+        stmt = (
+            select(FamilyMessage)
+            .where(
+                FamilyMessage.elderly_user_id == elderly_user_id,
+                FamilyMessage.sender_role == "family",
+                FamilyMessage.category == "dog_relay",
             )
             .order_by(FamilyMessage.created_at.desc(), FamilyMessage.id.desc())
             .limit(limit)

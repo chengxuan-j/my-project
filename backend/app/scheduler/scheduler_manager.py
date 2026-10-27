@@ -34,6 +34,10 @@ def register_jobs() -> None:
     from app.scheduler.jobs.emotion_alert import emotion_alert_check_job
     from app.scheduler.jobs.daily_digest import daily_digest_job
     from app.scheduler.jobs.story_gap_scan import story_gap_scan_job
+    from app.scheduler.jobs.health_reminder import (
+        health_reminder_job,
+        letter_delivery_job,
+    )
 
     scheduler = get_scheduler()
     settings = get_settings()
@@ -106,6 +110,23 @@ def register_jobs() -> None:
             name="回忆录缺口扫描",
             replace_existing=True,
         )
+
+    # 健康提醒：5 分钟扫一次。任务幂等，重复跑不会重复提醒同一顿药。
+    scheduler.add_job(
+        health_reminder_job,
+        IntervalTrigger(minutes=5),
+        id="health_reminder",
+        name="健康关怀提醒",
+        replace_existing=True,
+    )
+    # 时光信笺投递：10 分钟扫一次，到点即送达
+    scheduler.add_job(
+        letter_delivery_job,
+        IntervalTrigger(minutes=10),
+        id="letter_delivery",
+        name="时光信笺投递",
+        replace_existing=True,
+    )
 
     logger.info("已注册 %d 个定时任务", len(scheduler.get_jobs()))
 

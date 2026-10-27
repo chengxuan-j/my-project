@@ -6,7 +6,9 @@
 
 Base 在 app.db.models 中定义。本模块只负责引擎与会话。
 """
+import logging
 import os
+import sqlite3
 from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import (
@@ -18,6 +20,8 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.orm import DeclarativeBase
 
 from app.config import BASE_DIR, get_settings
+
+logger = logging.getLogger(__name__)
 
 
 class Base(DeclarativeBase):
@@ -72,9 +76,66 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         yield session
 
 
+def _sqlite_path(url: str) -> str | None:
+    """从 SQLAlchemy URL 取 SQLite 文件路径；非 SQLite 返回 None。"""
+    if not url.startswith("sqlite") or "///" not in url:
+        return None
+    return url.split("///", 1)[1].split("?", 1)[0] or None
+
+
+def _prepare_sqlite(url: str) -> None:
+    """启动自愈：确认 SQLite 可写，并切回 WAL。
+
+    背景（2026-10-26 事故）：进程被强杀后可能留下状态异常的 `-shm`，
+    之后所有连接都会报 "attempt to write a readonly database"（登录直接 500）。
+    这里在引擎创建前做一次写锁探测：写不进去且提示 readonly 时，
+    删掉残留的 `-shm` 再试一次。单实例部署下安全；多实例部署请改用 PG。
+    """
+    path = _sqlite_path(url)
+    if not path:
+        return
+
+    def _can_write() -> None:
+        conn = sqlite3.connect(path, timeout=10)
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            conn.rollback()
+        finally:
+            conn.close()
+
+    try:
+        _can_write()
+    except sqlite3.OperationalError as e:
+        if "readonly" not in str(e).lower():
+            logger.warning("SQLite 预检失败（非 readonly）: %s", e)
+            return
+        shm = path + "-shm"
+        try:
+            if os.path.exists(shm):
+                os.remove(shm)
+                logger.warning("检测到残留 -shm，已清理后重试: %s", shm)
+            _can_write()
+            logger.info("SQLite 写权限已恢复")
+        except Exception as e2:  # noqa: BLE001
+            logger.error("SQLite 仍不可写，登录等写操作会失败: %s", e2)
+            return
+
+    try:
+        conn = sqlite3.connect(path, timeout=10)
+        try:
+            mode = conn.execute("PRAGMA journal_mode=WAL").fetchone()
+            logger.info("SQLite journal_mode=%s", mode[0] if mode else "?")
+        finally:
+            conn.close()
+    except Exception as e:  # noqa: BLE001  切 WAL 失败不影响启动
+        logger.warning("切换 WAL 失败: %s", e)
+
+
 async def init_async_db() -> None:
     """启动时建表。生产环境用 Alembic 时本函数可省略。"""
     from app.db import models  # noqa: F401  确保模型已注册到 metadata
+
+    _prepare_sqlite(_normalize_url(get_settings().database_url))
 
     engine = get_engine()
     async with engine.begin() as conn:

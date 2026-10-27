@@ -28,6 +28,8 @@ from app.repositories.alert_repo import AlertRepo
 from app.repositories.family_message_repo import FamilyMessageRepo
 from app.repositories.profile_repo import ConversationRepo, FamilyRepo, MemoryRepo
 from app.repositories.story_repo import CompilationRepo, StoryMediaRepo, StoryRepo
+from app.services.care_overview import build_care_index, build_chat_rhythm, build_care_signals, build_dog_log
+from app.services.memory_insights import build_memoir_pipeline, build_memory_graph
 from app.schemas import (
     AlertResponse,
     BindElderlyRequest,
@@ -118,6 +120,110 @@ async def elderly_emotion(
          "created_at": r.created_at.isoformat() if r.created_at else ""}
         for r in records
     ]}
+
+
+@router.get("/elderly/{elderly_id}/rhythm")
+async def elderly_chat_rhythm(
+    elderly_id: str,
+    days: int = 28,
+    account: Account = Depends(require_family),
+    session: AsyncSession = Depends(get_db),
+):
+    """家属查看已绑定老人的对话节律（7×24 计数矩阵）。
+
+    只回答「什么时候聊了多少轮」，响应里没有任何对话内容。
+    """
+    repo = FamilyRepo(session)
+    if elderly_id not in await repo.list_elderly(account.user_id):
+        raise HTTPException(status_code=403, detail="未绑定该老人")
+    return await build_chat_rhythm(session, elderly_id, days)
+
+
+@router.get("/elderly/{elderly_id}/care-index")
+async def elderly_care_index(
+    elderly_id: str,
+    account: Account = Depends(require_family),
+    session: AsyncSession = Depends(get_db),
+):
+    """家属查看已绑定老人的关怀指数（0-100 + 四个可解释因子）。
+
+    因子只用情绪标注与计数（既有 /emotion 接口同口径），不读正文。
+    """
+    repo = FamilyRepo(session)
+    if elderly_id not in await repo.list_elderly(account.user_id):
+        raise HTTPException(status_code=403, detail="未绑定该老人")
+    return await build_care_index(session, elderly_id)
+
+
+@router.get("/elderly/{elderly_id}/memory-graph")
+async def elderly_memory_graph(
+    elderly_id: str,
+    account: Account = Depends(require_family),
+    session: AsyncSession = Depends(get_db),
+):
+    """家属查看已绑定老人的「人物 × 话题」记忆图谱。
+
+    只返回词与共现计数，不返回任何记忆原文。
+    """
+    repo = FamilyRepo(session)
+    if elderly_id not in await repo.list_elderly(account.user_id):
+        raise HTTPException(status_code=403, detail="未绑定该老人")
+    from sqlalchemy import select as sql_select
+    from app.db.models import ElderlyProfile as EP
+    prof = (await session.execute(
+        sql_select(EP).where(EP.user_id == elderly_id)
+    )).scalar_one_or_none()
+    return await build_memory_graph(
+        session, elderly_id, elderly_name=prof.name if prof else ""
+    )
+
+
+@router.get("/elderly/{elderly_id}/care-signals")
+async def elderly_care_signals(
+    elderly_id: str,
+    account: Account = Depends(require_family),
+    session: AsyncSession = Depends(get_db),
+):
+    """家属查看已绑定老人的陪伴需求信号（近 7 天命中 + 环比）。
+
+    只读 scene/intent/topic 标注字段，不返回对话原文。
+    """
+    repo = FamilyRepo(session)
+    if elderly_id not in await repo.list_elderly(account.user_id):
+        raise HTTPException(status_code=403, detail="未绑定该老人")
+    return await build_care_signals(session, elderly_id)
+
+
+@router.get("/elderly/{elderly_id}/dog-log")
+async def elderly_dog_log(
+    elderly_id: str,
+    account: Account = Depends(require_family),
+    session: AsyncSession = Depends(get_db),
+):
+    """家属查看小狗传话记录：跑了几趟、谁最常带话、老人看了没有。
+
+    只统计 category='dog_relay' 的留言，不涉及其它留言内容。
+    """
+    repo = FamilyRepo(session)
+    if elderly_id not in await repo.list_elderly(account.user_id):
+        raise HTTPException(status_code=403, detail="未绑定该老人")
+    return await build_dog_log(session, elderly_id)
+
+
+@router.get("/elderly/{elderly_id}/memoir-pipeline")
+async def elderly_memoir_pipeline(
+    elderly_id: str,
+    account: Account = Depends(require_family),
+    session: AsyncSession = Depends(get_db),
+):
+    """家属查看回忆录的四段流水线计数（线索→留档→隐私分级→可见）。
+
+    契约2：只统计家属可见集合，私密/锁定条目连计数都不出现。
+    """
+    repo = FamilyRepo(session)
+    if elderly_id not in await repo.list_elderly(account.user_id):
+        raise HTTPException(status_code=403, detail="未绑定该老人")
+    return await build_memoir_pipeline(session, elderly_id)
 
 
 @router.get("/elderly/{elderly_id}/memories")

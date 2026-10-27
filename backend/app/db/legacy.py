@@ -204,7 +204,12 @@ def get_conn() -> Iterator[sqlite3.Connection]:
     conn = sqlite3.connect(_db_path(), timeout=10)
     conn.row_factory = sqlite3.Row
     try:
-        conn.execute("PRAGMA journal_mode=WAL")
+        # 2026-10-26：不再强制 WAL。
+        # 强制 WAL 会生成 companion.db-wal/-shm；如果进程被强杀，残留的 -shm
+        # 会让后续所有连接（包括后端自己）报 "attempt to write a readonly database"，
+        # 登录写 refresh_tokens 直接 500。本机是单用户 demo，DELETE 模式足够，
+        # 且强杀后不会留下这种锁文件。数据库文件当前的 journal_mode 已经是 delete，
+        # 这里不再覆盖，避免又切回 WAL。
         yield conn
         conn.commit()
     except sqlite3.Error:

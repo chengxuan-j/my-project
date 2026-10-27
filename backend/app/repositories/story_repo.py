@@ -240,6 +240,18 @@ class ElicitationRepo:
     def __init__(self, session) -> None:
         self.session = session
 
+    async def count_by_status(self, elderly_user_id: str) -> dict[str, int]:
+        """各状态计数（流水线透视图用；只返回状态名，不含追问问题内容）。"""
+        rows = (await self.session.execute(
+            select(StoryElicitationQueue.status).where(
+                StoryElicitationQueue.elderly_user_id == elderly_user_id
+            )
+        )).scalars().all()
+        result: dict[str, int] = {}
+        for status in rows:
+            result[status] = result.get(status, 0) + 1
+        return result
+
     async def add(
         self, elderly_user_id: str, story_id: int, *,
         question: str, gap_type: str, priority: float = 0.5,

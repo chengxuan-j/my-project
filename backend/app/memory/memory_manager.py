@@ -45,6 +45,9 @@ class ChatContext:
     # M4：本轮的追问决定（含 follow_up_hint）。None = 本轮不追问。
     # 只是"预选"，真正记账由 chat 路由在**生成成功之后**做，见 elicitation。
     elicitation: Optional[Dict[str, Any]] = None
+    # 健康关怀：当前未确认的吃药/复诊提醒。由 agent 层查好塞进来，
+    # 只进 prompt 供 AI 自然提一句，不改变回答长度与策略。
+    health_due: List[Dict[str, Any]] = field(default_factory=list)
 
 
 class MemoryManager:
@@ -85,12 +88,17 @@ class MemoryManager:
         # 注意：topic 来自 analysis，所以必须在 analysis 之后发起。
         # 知识库检索带上最近几轮老人原话——查询改写需要上文来消解
         # "这个怎么办"这类指代（见 app/rag/rewrite.py 的规则门控）。
+        #
+        # 寒暄不查知识库：一句"你好/在吗"去检索既没有可用的资料，
+        # 又白花一次 embedding（冷启动时能到 2.6s）。省掉这一步，
+        # 老人打招呼时首个字能早出来约 0.3~2.5s。
+        need_knowledge = not (intent == "greeting" and len(message.strip()) <= 10)
         long_memories, knowledge_results = await asyncio.gather(
             self.long.search_multi(user_id, [message, topic]),
             self.knowledge.search(
                 f"{message} {topic}".strip(), user_id=user_id, top_k=4,
                 history=[c for r, c in history if r == "user"][-3:],
-            ),
+            ) if need_knowledge else asyncio.sleep(0, result=[]),
         )
 
         # 第 5 轮：陪伴策略决策（规则引擎，确定性）

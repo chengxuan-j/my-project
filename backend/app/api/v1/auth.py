@@ -2,9 +2,11 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_current_account
+from app.core.dependencies import get_current_account, require_elderly
 from app.core.security import (
     TOKEN_TYPE_REFRESH,
     create_access_token,
@@ -13,16 +15,19 @@ from app.core.security import (
     try_decode,
 )
 from app.db.base import get_db
-from app.db.models import Account
+from app.db.models import Account, ElderlyProfile
 from app.repositories.account_repo import AccountRepo, RefreshTokenRepo
+from app.repositories.profile_repo import ProfileRepo
 from app.schemas import (
     CurrentUserResponse,
     EmailCodeRequest,
     EmailLoginRequest,
     LoginRequest,
+    NameUpdateRequest,
     RefreshRequest,
     RegisterRequest,
     TokenResponse,
+    UsernameUpdateRequest,
 )
 from app.services.email_auth import (
     EmailCodeService,
@@ -35,7 +40,12 @@ from app.services.email_auth import (
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-def _token_response(account: Account, refresh_token: str, elderly_id: str | None = None) -> TokenResponse:
+def _token_response(
+    account: Account,
+    refresh_token: str,
+    elderly_id: str | None = None,
+    name: str | None = None,
+) -> TokenResponse:
     return TokenResponse(
         user_id=account.user_id,
         username=account.username,
@@ -45,7 +55,17 @@ def _token_response(account: Account, refresh_token: str, elderly_id: str | None
         elderly_id=elderly_id,
         invite_code=account.invite_code if account.role == "elderly" else None,
         email=account.email,
+        name=name,
     )
+
+
+async def _display_name(account: Account, session: AsyncSession) -> str | None:
+    """老人显示名取自画像 name；家属没有画像，返回 None（前端回退到 username）。"""
+    if account.role != "elderly":
+        return None
+    return (await session.execute(
+        select(ElderlyProfile.name).where(ElderlyProfile.user_id == account.user_id)
+    )).scalar_one_or_none()
 
 
 async def _elderly_id_for(account: Account, session: AsyncSession) -> str | None:
@@ -67,7 +87,8 @@ async def _issue_session(account: Account, session: AsyncSession) -> TokenRespon
     )
     await session.commit()
     return _token_response(
-        account, refresh_token, await _elderly_id_for(account, session)
+        account, refresh_token, await _elderly_id_for(account, session),
+        name=await _display_name(account, session),
     )
 
 
@@ -112,7 +133,10 @@ async def register(req: RegisterRequest, session: AsyncSession = Depends(get_db)
         expires_at=expires_at,
     )
     await session.commit()
-    return _token_response(account, refresh_token, elderly_id)
+    return _token_response(
+        account, refresh_token, elderly_id,
+        name=req.name if req.role == "elderly" else None,
+    )
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -238,7 +262,10 @@ async def refresh(req: RefreshRequest, session: AsyncSession = Depends(get_db)):
     else:
         elderly_id = account.user_id
 
-    return _token_response(account, new_refresh, elderly_id)
+    return _token_response(
+        account, new_refresh, elderly_id,
+        name=await _display_name(account, session),
+    )
 
 
 @router.get("/me", response_model=CurrentUserResponse)
@@ -259,7 +286,68 @@ async def me(
         role=account.role,
         elderly_id=elderly_id,
         email=account.email,
+        name=await _display_name(account, session),
     )
+
+
+@router.put("/name")
+async def update_display_name(
+    req: NameUpdateRequest,
+    account: Account = Depends(require_elderly),
+    session: AsyncSession = Depends(get_db),
+):
+    """修改老人的显示称呼。
+
+    只改 `elderly_profiles.name`——这个名字会同时用于：导航栏问候、
+    家属端老人列表、AI 对话 prompt 里的称呼。不碰 username（登录名），
+    避免改个称呼把登录方式也改了。
+    """
+    name = req.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="名字不能为空")
+    if len(name) > 20:
+        raise HTTPException(status_code=400, detail="名字最多 20 个字")
+
+    repo = ProfileRepo(session)
+    profile = await repo.get(account.user_id)
+    if profile is None:
+        profile = await repo.upsert(account.user_id, {"name": name})
+    else:
+        profile.name = name
+    await session.commit()
+    return {"name": name}
+
+
+@router.put("/username")
+async def update_username(
+    req: UsernameUpdateRequest,
+    account: Account = Depends(get_current_account),
+    session: AsyncSession = Depends(get_db),
+):
+    """修改登录用户名。
+
+    这是登录凭据的一部分，所以要求验证当前密码；成功后旧的登录名立即失效。
+    user_id / 邀请码 / 已绑定关系都不变，家属端不需要重新绑定。
+    """
+    username = req.username.strip()
+    if username == account.username:
+        return {"username": username}
+
+    repo = AccountRepo(session)
+    if not repo.verify(account, req.password):
+        raise HTTPException(status_code=401, detail="当前密码不正确")
+
+    existing = await repo.get_by_username(username)
+    if existing is not None and existing.user_id != account.user_id:
+        raise HTTPException(status_code=409, detail="这个登录名已经有人用了")
+
+    account.username = username
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        raise HTTPException(status_code=409, detail="这个登录名已经有人用了")
+    return {"username": username}
 
 
 @router.get("/invite-code")

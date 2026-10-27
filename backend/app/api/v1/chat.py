@@ -1,6 +1,7 @@
 """聊天路由（带 JWT 认证）。user_id 从 token 取，不再接受客户端传入。"""
 import json
 import logging
+import time
 import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
@@ -309,6 +310,11 @@ async def chat_stream(
                 user_id, ctx, analysis, reply, recommendation_id)})
             return
 
+        # 没命中预生成：把该用户还在跑的预生成任务取消掉，
+        # 别让"边说边算"和这条正式回复同时抢 Qwen 配额。
+        speculation.abort(user_id)
+
+        t0 = time.perf_counter()
         try:
             prepared = await agent_prepare(user_id, msg)
         except LLMError as e:
@@ -318,16 +324,28 @@ async def chat_stream(
 
         ctx = prepared["context"]
         analysis = prepared["analysis"]
+        t_prepared = time.perf_counter()
 
         chunks: list[str] = []
+        t_first = None
         try:
             async for piece in agent_stream_reply(user_id, msg, ctx):
+                if t_first is None:
+                    t_first = time.perf_counter()
                 chunks.append(piece)
                 yield _sse({"type": "delta", "text": piece})
         except LLMError as e:
             logger.error("流式生成失败: %s", e)
             yield _sse({"type": "error", "detail": str(e)})
             return
+
+        logger.info(
+            "chat_stream_timing user=%s prepare=%.2fs ttft=%.2fs total=%.2fs",
+            user_id,
+            t_prepared - t0,
+            (t_first - t0) if t_first else -1,
+            time.perf_counter() - t0,
+        )
 
         reply = "".join(chunks).strip()
         if not reply:

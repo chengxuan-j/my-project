@@ -11,12 +11,13 @@
 - JSON 字段：在 SQLite 与 PostgreSQL 下都用 SQLAlchemy JSON 类型，PG 下会自动用 JSONB
 - embedding：先用 JSON 存 list[float]，生产切 PG 后再用 pgvector 替换（保留同名以便切换）
 """
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import (
     JSON,
     Boolean,
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -433,6 +434,7 @@ class StoryCompilation(Base):
     video_url 同期限留且恒为 None。
     """
 
+
     __tablename__ = "story_compilations"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -451,4 +453,164 @@ class StoryCompilation(Base):
 
     __table_args__ = (
         Index("ix_story_compilations_user", "elderly_user_id", "created_at"),
+    )
+
+
+# ---------------------------------------------------------------------------
+# 健康关怀：用药计划 / 复诊预约 / 健康记录（血压为主）/ 提醒流水
+#
+# 设计取舍：
+# - 用药拆成「计划」与「流水」两张表：计划是规则（每天 8 点吃 1 片），
+#   流水是事实（今天 8 点这条提醒发了没、老人点没点"吃过了"）。
+#   不把已完成状态塞进计划里——否则第二天就没法复用同一条规则。
+# - 血压记录用一张通用 health_records 承载：systolic/diastolic 给血压，
+#   value/unit 给血糖/体重/体温。不为每种指标单开表，老人端也更好扩展。
+# ---------------------------------------------------------------------------
+
+class HealthMedication(Base):
+    """用药计划（长期规则，可停用）。"""
+
+    __tablename__ = "health_medications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    elderly_user_id: Mapped[str] = mapped_column(String(64), index=True)
+    name: Mapped[str] = mapped_column(String(64))
+    dosage: Mapped[str] = mapped_column(String(64), default="")
+    # 每天的服药时间点，形如 ["08:00", "20:00"]
+    times: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+    frequency: Mapped[str] = mapped_column(String(16), default="daily")  # daily/weekly/as_needed
+    # frequency=weekly 时生效，0=周一 … 6=周日
+    weekdays: Mapped[Optional[List[int]]] = mapped_column(JSON, nullable=True)
+    start_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    end_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    note: Mapped[str] = mapped_column(String(200), default="")
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        Index("ix_health_med_user_active", "elderly_user_id", "active"),
+    )
+
+
+class HealthAppointment(Base):
+    """复诊 / 检查预约。"""
+
+    __tablename__ = "health_appointments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    elderly_user_id: Mapped[str] = mapped_column(String(64), index=True)
+    title: Mapped[str] = mapped_column(String(100))          # 例：心内科复诊
+    hospital: Mapped[str] = mapped_column(String(100), default="")
+    department: Mapped[str] = mapped_column(String(64), default="")
+    doctor: Mapped[str] = mapped_column(String(64), default="")
+    appointment_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    location: Mapped[str] = mapped_column(String(200), default="")
+    note: Mapped[str] = mapped_column(String(200), default="")
+    remind_before_minutes: Mapped[int] = mapped_column(Integer, default=1440)  # 默认提前一天
+    status: Mapped[str] = mapped_column(String(16), default="scheduled")  # scheduled/done/cancelled
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        Index("ix_health_appt_user_time", "elderly_user_id", "appointment_at"),
+    )
+
+
+class HealthRecord(Base):
+    """健康指标记录：血压用 systolic/diastolic/pulse，其余用 value/unit。"""
+
+    __tablename__ = "health_records"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    elderly_user_id: Mapped[str] = mapped_column(String(64), index=True)
+    record_type: Mapped[str] = mapped_column(String(20), default="blood_pressure")
+    systolic: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    diastolic: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    pulse: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    value: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    unit: Mapped[str] = mapped_column(String(16), default="")
+    measured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    note: Mapped[str] = mapped_column(String(200), default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (
+        Index("ix_health_record_user_time", "elderly_user_id", "record_type", "measured_at"),
+    )
+
+
+class HealthReminderLog(Base):
+    """提醒流水：某条用药/复诊提醒在哪一刻发过、老人确认没有。
+
+    (kind, ref_id, scheduled_for) 唯一——定时任务反复扫描也不会重复发。
+    status：sent（发了未确认）/ acknowledged（老人点过"吃过了/知道了"）/ skipped。
+    """
+
+    __tablename__ = "health_reminder_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    elderly_user_id: Mapped[str] = mapped_column(String(64), index=True)
+    kind: Mapped[str] = mapped_column(String(16))  # medication/appointment
+    ref_id: Mapped[int] = mapped_column(Integer)
+    scheduled_for: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    status: Mapped[str] = mapped_column(String(16), default="sent")
+    message: Mapped[str] = mapped_column(String(255), default="")
+    acknowledged_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (
+        Index("uq_health_log_occurrence", "kind", "ref_id", "scheduled_for", unique=True),
+        Index("ix_health_log_user_time", "elderly_user_id", "scheduled_for"),
+    )
+
+
+# ---------------------------------------------------------------------------
+# 时光信笺：给未来的自己 / 家人留一句话
+#
+# 隐私契约（与 life_stories 一致的口径）：
+# - visibility=private：只有老人本人能读，家属端接口不返回、SSE 也不发；
+# - visibility=family：且必须 deliver_at <= now（已送达）才允许家属读，
+#   提前泄露就失去"时光"的意义。
+# ---------------------------------------------------------------------------
+
+class TimeLetter(Base):
+    __tablename__ = "time_letters"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    elderly_user_id: Mapped[str] = mapped_column(String(64), index=True)
+    title: Mapped[str] = mapped_column(String(100), default="")
+    content: Mapped[str] = mapped_column(Text)
+    recipient_type: Mapped[str] = mapped_column(String(16), default="self")  # self/family
+    recipient_name: Mapped[str] = mapped_column(String(64), default="")      # 给谁的称呼
+    deliver_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    visibility: Mapped[str] = mapped_column(String(16), default="private")   # private/family
+    # scheduled（未到时间）/ delivered（已送达）/ read（老人已拆开）
+    status: Mapped[str] = mapped_column(String(16), default="scheduled", index=True)
+    opened_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        Index("ix_time_letter_user_deliver", "elderly_user_id", "deliver_at"),
+        Index("ix_time_letter_status", "status", "deliver_at"),
     )

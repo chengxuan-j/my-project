@@ -15,11 +15,14 @@ const EVENT_TYPES = [
   'dog_relay',
   'face_emotion',
   'memoir_story',
+  'health_reminder',
+  'time_letter',
 ];
 
 /**
  * SSE 基址：
- * - 默认直连后端（开发 / 局域网多设备），端口取 NEXT_PUBLIC_API_PORT，默认 8127；
+ * - 默认直连后端（开发 / 局域网多设备），端口取 NEXT_PUBLIC_API_PORT，默认 8000
+ *   （与 backend/run.py、next.config.js 的 BACKEND_URL 保持一致）；
  * - 上线同域部署时设 `NEXT_PUBLIC_SSE_BASE=''`，走同源（Nginx 反代）。
  *
  * 注意：SSE 不走 Next.js rewrites——rewrites 会缓冲响应，导致流拿不到。
@@ -28,7 +31,7 @@ function resolveSseBase(): string {
   const cfg = process.env.NEXT_PUBLIC_SSE_BASE;
   if (cfg !== undefined) return cfg; // 空字符串表示同源
   if (typeof window !== 'undefined') {
-    const port = process.env.NEXT_PUBLIC_API_PORT || '8127';
+    const port = process.env.NEXT_PUBLIC_API_PORT || '8000';
     return `${window.location.protocol}//${window.location.hostname}:${port}`;
   }
   return '';

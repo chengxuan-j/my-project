@@ -32,6 +32,10 @@ interface AuthState {
   setAuth: (user: UserInfo, accessToken: string, refreshToken: string) => void;
   /** 刷新 token：只更新当前激活账号的 token */
   setTokens: (accessToken: string, refreshToken: string) => void;
+  /** 改称呼后同步本地会话，导航栏/聊天头部立即生效 */
+  updateUserName: (name: string) => void;
+  /** 改登录名后同步本地会话（下次登录用新名字） */
+  updateLoginName: (username: string) => void;
   /** 切换激活账号 */
   switchAccount: (key: string) => void;
   /** 退出指定账号（若退出的是激活账号，则自动切到剩余的第一个） */
@@ -73,6 +77,30 @@ export const useAuthStore = create<AuthState>()(
         }
         const next = sessions.map((s) =>
           s.key === activeId ? { ...s, accessToken, refreshToken } : s
+        );
+        set({ sessions: next, ...activeFrom(next, activeId) });
+      },
+
+      updateUserName: (name) => {
+        const { sessions, activeId, user } = get();
+        if (!activeId) {
+          if (user) set({ user: { ...user, name } });
+          return;
+        }
+        const next = sessions.map((s) =>
+          s.key === activeId ? { ...s, user: { ...s.user, name } } : s
+        );
+        set({ sessions: next, ...activeFrom(next, activeId) });
+      },
+
+      updateLoginName: (username) => {
+        const { sessions, activeId, user } = get();
+        if (!activeId) {
+          if (user) set({ user: { ...user, username } });
+          return;
+        }
+        const next = sessions.map((s) =>
+          s.key === activeId ? { ...s, user: { ...s.user, username } } : s
         );
         set({ sessions: next, ...activeFrom(next, activeId) });
       },

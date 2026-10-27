@@ -21,9 +21,11 @@ from app.companion.prompts import (
     LENGTH_RULE_SHORT,
     build_messages,
 )
+from app.db.base import get_session_factory
 from app.emotion.emotion_analyzer import AnalysisResult, EmotionAnalyzer
 from app.llm.qwen_client import QwenClient
 from app.memory.memory_manager import MemoryManager
+from app.services import health_care as health_svc
 from app.services.face_emotion import face_emotion
 
 logger = logging.getLogger(__name__)
@@ -145,6 +147,16 @@ async def build_context(user_id: str, message: str,
     """上下文工具：画像 + 短期/长期记忆 + 策略决策 + 内容推荐。"""
     a = AnalysisResult(**analysis)
     ctx = await _deps.memory.build_context(user_id, message, analysis=a)
+
+    # 健康关怀：查一次"现在还没确认的吃药/复诊"。
+    # 失败不影响主链路——提醒页面本身仍能看，只是这一轮 AI 不知道。
+    try:
+        async with get_session_factory()() as session:
+            ctx.health_due = await health_svc.due_reminders(session, user_id)
+    except Exception:  # noqa: BLE001
+        logger.warning("健康提醒读取失败 user_id=%s", user_id, exc_info=True)
+        ctx.health_due = []
+
     return {
         "profile": ctx.profile.model_dump(),
         "emotion": ctx.emotion,
@@ -163,6 +175,7 @@ async def build_context(user_id: str, message: str,
         "safety_directive": ctx.safety_directive,
         # M4：本轮预选的追问缺口（None = 不追问）。记账在 chat 路由做。
         "elicitation": ctx.elicitation,
+        "health_due": ctx.health_due[:5],
         "_ctx": ctx,  # 内部对象，供 generate 工具直接复用
     }
 
@@ -241,12 +254,21 @@ async def prepare(user_id: str, message: str) -> Dict[str, Any]:
     供流式接口复用与 /chat 完全相同的前置逻辑：先拿到情境分析与检索结果，
     再决定怎么生成，避免两条路径的画像/记忆注入出现差异。
     """
+    import time as _time
+
+    t0 = _time.perf_counter()
     analysis = await analyze_situation.ainvoke({
         "user_id": user_id, "message": message,
     })
+    t1 = _time.perf_counter()
     ctx = await build_context.ainvoke({
         "user_id": user_id, "message": message, "analysis": analysis,
     })
+    t2 = _time.perf_counter()
+    logger.info(
+        "prepare_timing user=%s analyze=%.2fs context=%.2fs total=%.2fs",
+        user_id, t1 - t0, t2 - t1, t2 - t0,
+    )
     return {"analysis": analysis, "context": ctx}
 
 

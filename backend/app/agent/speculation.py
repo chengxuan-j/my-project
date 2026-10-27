@@ -32,6 +32,10 @@ PREFIX_COVER_RATIO = 0.7
 
 _cache: Dict[str, Dict[str, Any]] = {}
 _tasks: Dict[str, asyncio.Task] = {}
+# 每个用户只保留一条在跑的预生成：部分识别结果每 2 秒就来一次，
+# 若任由它们并发，三四条生成会一起抢 Qwen 配额，正式的 /chat/stream
+# 反而排在后面——体感就是"说话停顿后要等很久才出声"。
+_user_tasks: Dict[str, asyncio.Task] = {}
 
 _PUNCT_RE = re.compile(r"[\s，。！？、；：,.!?;:~·…—\-\u3000]+")
 
@@ -98,6 +102,14 @@ async def speculate(user_id: str, message: str) -> bool:
     if running is not None and not running.done():
         return True
 
+    # 同一用户只保留最新一条：新的部分识别结果更接近最终文本，
+    # 旧的预生成已经没用了，取消它，把算力让给新的和正式请求。
+    prev = _user_tasks.get(user_id)
+    if prev is not None and not prev.done():
+        prev.cancel()
+
+    task: Optional[asyncio.Task] = None
+
     async def _run() -> None:
         # 延迟导入避免循环依赖（companion_agent 也会 import 本模块的场景）
         from app.agent import companion_agent
@@ -119,11 +131,28 @@ async def speculate(user_id: str, message: str) -> bool:
                     "ts": time.time(),
                 }
                 logger.info("预生成完成 len=%d reply=%s", len(key), reply[:30])
+        except asyncio.CancelledError:
+            logger.info("预生成已取消 len=%d", len(key))
+            raise
         except Exception:  # noqa: BLE001  预生成失败绝不能影响正常链路
             logger.exception("预生成失败 len=%d", len(key))
         finally:
-            _tasks.pop(key, None)
+            # 只清理自己：期间可能已经换成了更新的一条
+            if _tasks.get(key) is task:
+                _tasks.pop(key, None)
+            if _user_tasks.get(user_id) is task:
+                _user_tasks.pop(user_id, None)
 
-    _tasks[key] = asyncio.create_task(_run())
+    task = asyncio.create_task(_run())
+    _tasks[key] = task
+    _user_tasks[user_id] = task
     logger.info("已接受预生成请求 len=%d", len(key))
     return True
+
+
+def abort(user_id: str) -> None:
+    """正式请求开始时调用：取消该用户还在跑的预生成，别和真回复抢配额。"""
+    task = _user_tasks.pop(user_id, None)
+    if task is not None and not task.done():
+        task.cancel()
+        logger.info("预生成让路：正式请求开始 user=%s", user_id)

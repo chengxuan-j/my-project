@@ -1,13 +1,21 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore, Session } from '@/stores/auth';
+import { authApi } from '@/lib/api';
 import { FontSizeToggle } from './FontSizeToggle';
+import { DialectSwitch } from './DialectSwitch';
 import { useSettingsStore } from '@/stores/settings';
+import { useCareStore } from '@/stores/care';
 
 const NAV_ITEMS_ELDERLY = [
   { href: '/', label: '💬 聊天' },
+  { href: '/care', label: '❤️ 关怀' },
+  { href: '/letters', label: '💌 信笺' },
+  { href: '/journey', label: '🌊 人生河' },
+  { href: '/book', label: '📗 人生之书' },
   { href: '/memoir', label: '📖 回忆录' },
   { href: '/profile', label: '👤 我的' },
   { href: '/account', label: '⚙ 账号' },
@@ -24,6 +32,18 @@ export function NavBar() {
   const router = useRouter();
   const { user, sessions, activeId, switchAccount, removeAccount } = useAuthStore();
   const { highContrast, toggleHighContrast } = useSettingsStore();
+  const dueCount = useCareStore((s) => s.dueCount);
+
+  // 旧版本登录缓存里没有 name，补拉一次，避免导航一直显示登录名
+  useEffect(() => {
+    if (!user || user.role !== 'elderly' || user.name) return;
+    authApi
+      .me()
+      .then((me) => {
+        if (me.name) useAuthStore.getState().updateUserName(me.name);
+      })
+      .catch(() => undefined);
+  }, [user]);
 
   // 登录/注册页不显示导航
   if (pathname === '/login' || pathname === '/register') return null;
@@ -64,11 +84,20 @@ export function NavBar() {
                 }`}
               >
                 {item.label}
+                {item.href === '/care' && dueCount > 0 && (
+                  <span
+                    aria-label={`${dueCount} 条待处理提醒`}
+                    className="ml-1 inline-flex items-center justify-center min-w-[22px] h-[22px] px-1 rounded-full bg-rose-500 text-white text-xs font-bold"
+                  >
+                    {dueCount}
+                  </span>
+                )}
               </Link>
             ))}
           </nav>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <DialectSwitch />
           <FontSizeToggle />
           <button
             onClick={toggleHighContrast}

@@ -197,3 +197,61 @@ class ConversationRepo:
             .limit(limit)
         )
         return list((await self.session.execute(stmt)).scalars().all())
+
+    async def conversation_tags_since(
+        self, user_id: str, since: Any, role: Optional[str] = None
+    ) -> List[Any]:
+        """某时间点之后的对话标注（时间正序）。
+
+        只取 created_at / current_topic / intent / scene 四个标注字段——
+        陪伴需求信号聚合用，**不取 content**，避免正文进统计链路。
+        """
+        stmt = (
+            select(
+                Conversation.created_at,
+                Conversation.current_topic,
+                Conversation.intent,
+                Conversation.scene,
+            )
+            .where(Conversation.user_id == user_id, Conversation.created_at >= since)
+            .order_by(Conversation.created_at.asc())
+        )
+        if role:
+            stmt = stmt.where(Conversation.role == role)
+        return list((await self.session.execute(stmt)).all())
+
+    async def emotions_since(self, user_id: str, since: Any) -> List[EmotionRecord]:
+        """某时间点之后的情绪记录（时间正序）。"""
+        stmt = (
+            select(EmotionRecord)
+            .where(EmotionRecord.user_id == user_id, EmotionRecord.created_at >= since)
+            .order_by(EmotionRecord.created_at.asc())
+        )
+        return list((await self.session.execute(stmt)).scalars().all())
+
+    async def conversations_since(
+        self, user_id: str, since: Any, role: Optional[str] = None
+    ) -> List[Conversation]:
+        """某时间点之后的对话（按时间正序）。
+
+        节律/关怀指数只用到 created_at 与 role，不取 content，
+        避免把对话原文带进统计链路。
+        """
+        stmt = (
+            select(Conversation.created_at, Conversation.role)
+            .where(Conversation.user_id == user_id, Conversation.created_at >= since)
+            .order_by(Conversation.created_at.asc())
+        )
+        if role:
+            stmt = stmt.where(Conversation.role == role)
+        return list((await self.session.execute(stmt)).all())
+
+    async def last_conversation_at(self, user_id: str) -> Optional[Any]:
+        """最近一条对话时间（用于「沉默天数」计算）。"""
+        stmt = (
+            select(Conversation.created_at)
+            .where(Conversation.user_id == user_id)
+            .order_by(Conversation.created_at.desc())
+            .limit(1)
+        )
+        return (await self.session.execute(stmt)).scalar_one_or_none()
