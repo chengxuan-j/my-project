@@ -5,7 +5,7 @@
 """
 import os
 from functools import lru_cache
-from typing import List
+from typing import List, Optional
 
 from dotenv import load_dotenv
 from pydantic import Field
@@ -46,6 +46,12 @@ class Settings(BaseSettings):
     # 情绪倾诉/故事/健康等仍走 qwen-plus，不为速度牺牲共情质量。
     qwen_fast_model: str = "qwen-flash"
     embedding_model: str = "text-embedding-v3"
+    # 推理模型（qwen3 系列如 qwen3.7-flash）默认会先吐一大段思维链，
+    # content 要等思考完才出来：2026-10-28 实测同一句话「想女儿了」
+    # 开思考 9.76s / 关思考 2.97s。陪伴场景等 10 秒不可接受，所以允许显式关掉。
+    # None = 不传该参数（保持服务端默认，兼容非推理模型）；
+    # False = 关思考；True = 强制开。
+    qwen_enable_thinking: Optional[bool] = None
     # 兼容旧环境变量名 QWEN_TIMEOUT
     request_timeout: float = Field(default=60.0, validation_alias="QWEN_TIMEOUT")
 
