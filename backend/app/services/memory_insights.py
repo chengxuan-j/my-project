@@ -20,14 +20,19 @@ from collections import Counter
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-import jieba
-import jieba.posseg as pseg
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import LifeStory
 from app.repositories.profile_repo import ConversationRepo, MemoryRepo, ProfileRepo
 from app.repositories.story_repo import ElicitationRepo, StoryRepo
+
+# jieba 是可选依赖：本模块只做「锦上添花」的图谱分析，缺包不该让整个后端起不来。
+# 没装时退化成正则近似切分，功能降级但服务可用（与 app/rag/bm25.py 的约定一致）。
+try:
+    import jieba.posseg as pseg
+except Exception:  # pragma: no cover - 仅在未安装 jieba 的环境触发
+    pseg = None  # type: ignore[assignment]
 
 # 人物称谓：与前端 src/lib/personExtract.ts 的 RELATION_WORDS 同步
 # （前端没有的「阿姨/保姆/护工」是居家照护角色，图谱侧补充）
@@ -54,6 +59,24 @@ MIN_PERSON_MENTIONS = 2
 MAX_TOPICS = 12
 MAX_PERSONS = 8
 
+# 无 jieba 时的退化切分：连续中文块 + 英文整词
+_FALLBACK_RE = re.compile(r"[\u4e00-\u9fff]{2,}|[a-zA-Z]{2,}")
+# 退化模式下话题必须有足够频次，否则二元组噪音会把真话题挤出 top N
+FALLBACK_MIN_TOPIC_MENTIONS = 2
+
+
+def _fallback_terms(content: str) -> List[str]:
+    """没有 jieba 时的近似分词：中文块拆成相邻二字，英文按整词。"""
+    terms: List[str] = []
+    for chunk in _FALLBACK_RE.findall(content):
+        if chunk.isascii():
+            terms.append(chunk.lower())
+        elif len(chunk) <= 2:
+            terms.append(chunk)
+        else:
+            terms.extend(chunk[i : i + 2] for i in range(len(chunk) - 1))
+    return terms
+
 
 def _extract_persons_topics(content: str) -> Tuple[Set[str], Set[str]]:
     """一条记忆 → (人物集合, 话题集合)。"""
@@ -61,13 +84,23 @@ def _extract_persons_topics(content: str) -> Tuple[Set[str], Set[str]]:
     topics: Set[str] = set()
     if not content:
         return persons, topics
-    for word, flag in pseg.cut(content):
-        if len(word) < 2 or word in TOPIC_STOPWORDS:
-            continue
-        if flag.startswith('nr'):
-            persons.add(word)  # 专名：王奶奶 / 老李 / 小芳
-        elif flag.startswith('n') and word not in RELATION_WORDS:
+
+    if pseg is not None:
+        for word, flag in pseg.cut(content):
+            if len(word) < 2 or word in TOPIC_STOPWORDS:
+                continue
+            if flag.startswith('nr'):
+                persons.add(word)  # 专名：王奶奶 / 老李 / 小芳
+            elif flag.startswith('n') and word not in RELATION_WORDS:
+                topics.add(word)
+    else:
+        # 没有词性标注就分不清人名和名词：人物只靠下面的称谓正则，
+        # 话题用二元组近似（低频噪音在选 top 时按频次阈值滤掉）
+        for word in _fallback_terms(content):
+            if len(word) < 2 or word in TOPIC_STOPWORDS or word in RELATION_WORDS:
+                continue
             topics.add(word)
+
     for m in RELATION_RE.finditer(content):
         persons.add(m.group(1))  # 称谓：女儿 / 老伴
     return persons, topics
@@ -99,7 +132,11 @@ async def build_memory_graph(
         p for p, c in raw_person_tf.most_common()
         if p in RELATION_WORDS or c >= MIN_PERSON_MENTIONS
     ][:MAX_PERSONS]
-    top_topics = [t for t, _ in topic_tf.most_common(MAX_TOPICS)]
+    top_topics = [
+        t for t, c in topic_tf.most_common(MAX_TOPICS * 3)
+        # 有 jieba 时词性已过滤过；退化模式下二元组噪音大，按频次兜一道
+        if pseg is not None or c >= FALLBACK_MIN_TOPIC_MENTIONS
+    ][:MAX_TOPICS]
     person_set, topic_set = set(top_persons), set(top_topics)
     edges = [
         {"person": p, "topic": t, "count": c}
