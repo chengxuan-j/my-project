@@ -107,7 +107,7 @@ export default function RegisterPage() {
   // 注册成功且是老人：显示邀请码
   if (successInfo) {
     return (
-      <div className="min-h-[calc(100vh-64px)] flex items-center justify-center px-4 py-8">
+      <div className="app-min-screen flex items-center justify-center px-4 py-8">
         <div className="w-full max-w-md bg-white rounded-3xl shadow-lg p-8 border-2 border-warm-light text-center space-y-6">
           <div className="text-6xl">🎉</div>
           <h1 className="text-2xl font-bold text-warm-primary">注册成功！</h1>
@@ -129,7 +129,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-64px)] flex items-center justify-center px-4 py-8">
+    <div className="app-min-screen flex items-center justify-center px-4 py-8">
       <div className="w-full max-w-md bg-white rounded-3xl shadow-lg p-8 border-2 border-warm-light">
         <h1 className="text-3xl font-bold text-center text-warm-primary mb-2">
           🌻 注册账号

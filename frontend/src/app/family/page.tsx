@@ -1221,7 +1221,9 @@ export default function FamilyPage() {
       {memoirToast && (
         <div
           role="status"
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-warm-dark text-white px-5 py-3 rounded-xl shadow-lg text-base"
+          className="fixed left-1/2 -translate-x-1/2 z-50 bg-warm-dark text-white px-5 py-3 rounded-xl shadow-lg text-base"
+          // 手机底部有固定 TabBar，提示条要抬到它上面才看得见
+          style={{ bottom: 'calc(1.5rem + var(--app-tabbar-h))' }}
         >
           {memoirToast}
         </div>

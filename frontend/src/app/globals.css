@@ -4,10 +4,27 @@
 
 :root {
   --font-size-base: 18px;
+
+  /* 顶部导航真实高度：NavBar 用 ResizeObserver 实时写回这里。
+     字号放大 / 菜单换行都会改变它，页面高度必须跟着变，不能再写死 72px。 */
+  --app-header-h: 72px;
+  /* 手机底部 TabBar 高度，桌面为 0；手机端含 iOS 底部安全区 */
+  --app-tabbar-h: 0px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* 手机：顶栏只留一行（logo + 更多），导航移到底部 TabBar */
+@media (max-width: 767px) {
+  :root {
+    --app-header-h: 60px;
+    --app-tabbar-h: calc(60px + var(--safe-bottom));
+  }
 }
 
 html {
   font-size: var(--font-size-base);
+  /* 兜底：个别组件超宽时不该让整页横向滚动，把导航推出屏幕外 */
+  overflow-x: hidden;
 }
 
 html.font-large {
@@ -22,6 +39,62 @@ body {
   background-color: #FFFBEB;
   color: #1F2937;
   min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+
+/**
+ * 页面主容器：常规滚动页面在底部留出 TabBar 的位置，否则最后一屏内容会被挡住。
+ * 桌面端 --app-tabbar-h 为 0，等价于原来的 pb-8。
+ */
+.app-main {
+  padding-bottom: calc(2rem + var(--app-tabbar-h));
+}
+
+/* 背景色要一直铺到屏幕底部的页面（如通话页），用负 margin 抵掉上面的留白 */
+.app-main-bleed {
+  margin-bottom: calc(-2rem - var(--app-tabbar-h));
+}
+
+/**
+ * 铺满可视区的页面容器（聊天、通话这类不能整页滚动的页面）。
+ *
+ * 减去顶栏 + 底部 TabBar + main 的上下留白，剩下的正好是一屏。
+ * 首选 dvh：移动端地址栏收起/键盘弹出时 100vh 不会变，用 vh 会被挡住。
+ */
+.app-fill-viewport {
+  height: calc(100vh - var(--app-header-h) - var(--app-tabbar-h) - 2rem);
+}
+
+@supports (height: 100dvh) {
+  .app-fill-viewport {
+    height: calc(100dvh - var(--app-header-h) - var(--app-tabbar-h) - 2rem);
+  }
+}
+
+/**
+ * 同上，但配合 .app-main-bleed 使用：main 的底部留白已经被负 margin 抵消，
+ * 所以这里不再减那 2rem，让深色背景正好铺到 TabBar 上沿。
+ */
+.app-fill-viewport-bleed {
+  height: calc(100vh - var(--app-header-h) - var(--app-tabbar-h));
+}
+
+@supports (height: 100dvh) {
+  .app-fill-viewport-bleed {
+    height: calc(100dvh - var(--app-header-h) - var(--app-tabbar-h));
+  }
+}
+
+/* 登录/注册这类不显示导航的页面：铺满一屏即可，dvh 优先、vh 兜底 */
+.app-min-screen {
+  min-height: 100vh;
+}
+
+@supports (height: 100dvh) {
+  .app-min-screen {
+    min-height: 100dvh;
+  }
 }
 
 /* 高对比度模式：黑底黄字 */

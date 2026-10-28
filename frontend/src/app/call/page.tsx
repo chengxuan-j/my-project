@@ -148,8 +148,12 @@ export default function CallPage() {
       const el = pageRef.current;
       if (!el) return;
       const top = el.getBoundingClientRect().top;
-      // 根 layout 是 <main class="pb-8">，下面用 -mb-8 抵掉，这里只扣到视口底
-      const next = Math.max(window.innerHeight - top, 400);
+      // 手机端底部 TabBar 是 fixed 的，会压住视口底部，算可用高度时必须让出来
+      const tabbarH =
+        parseFloat(
+          getComputedStyle(document.documentElement).getPropertyValue('--app-tabbar-h')
+        ) || 0;
+      const next = Math.max(window.innerHeight - top - tabbarH, 400);
       setAvailH((prev) => (prev === null || Math.abs(prev - next) > 1 ? next : prev));
     };
     measure();
@@ -569,11 +573,11 @@ export default function CallPage() {
   return (
     <div
       ref={pageRef}
-      className="text-white overflow-hidden -mb-8"
+      className="text-white overflow-hidden app-main-bleed app-fill-viewport-bleed"
       style={{
         background:
           'radial-gradient(120% 85% at 50% 0%, #3d2a1b 0%, #241a12 45%, #14100c 100%)',
-        height: availH ? `${availH}px` : 'calc(100vh - 76px)',
+        height: availH ? `${availH}px` : undefined,
       }}
     >
       <div className="max-w-3xl mx-auto px-4 py-4 h-full flex flex-col overflow-hidden">

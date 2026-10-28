@@ -545,7 +545,14 @@ export function CameraPanel({ onClose, onVoice }: CameraPanelProps) {
     : '就绪 · 对着摄像头做动作';
 
   return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col">
+    <div
+      className="fixed inset-0 z-50 bg-black flex flex-col"
+      // 全屏取景：顶部躲开刘海、底部躲开 iPhone 横条，否则按钮点不到
+      style={{
+        paddingTop: 'env(safe-area-inset-top, 0px)',
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+      }}
+    >
       {/* 顶部栏 */}
       <div className="flex items-center justify-between px-4 py-3 bg-black/60 gap-3 flex-wrap">
         <h2 className="text-white text-2xl font-bold">

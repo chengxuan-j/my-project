@@ -20,6 +20,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 5,
   themeColor: '#F59E0B',
+  // 让页面铺到 iPhone 刘海/底部横条下面，再由 safe-area 变量补内边距
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({
@@ -29,12 +31,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="zh-CN">
-      <body className="min-h-screen bg-warm-bg">
+      <body className="bg-warm-bg">
         <SettingsProvider>
           <NavBar />
           <CareAlertModal />
           <LetterArrivalModal />
-          <main className="pb-8">{children}</main>
+          <main className="app-main">{children}</main>
           <ServiceWorkerRegister />
         </SettingsProvider>
       </body>

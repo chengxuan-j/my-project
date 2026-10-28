@@ -445,7 +445,7 @@ export default function ChatPage() {
   const visibleFamInbox = famInbox.filter((m) => m.category !== 'dog_relay');
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-4 flex flex-col h-[calc(100vh-72px)]">
+    <div className="max-w-3xl mx-auto px-4 pt-4 flex flex-col app-fill-viewport">
       {/* 顶部状态栏 */}
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
         <h1 className="text-2xl font-bold text-warm-primary">
