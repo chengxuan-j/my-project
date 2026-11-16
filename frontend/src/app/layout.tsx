@@ -19,7 +19,8 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 5,
-  themeColor: '#F59E0B',
+  // 会被 SettingsProvider 按当前主题动态改写；这里是默认主题（粉彩）的顶栏色
+  themeColor: '#fffdf9',
   // 让页面铺到 iPhone 刘海/底部横条下面，再由 safe-area 变量补内边距
   viewportFit: 'cover',
 };
@@ -31,7 +32,15 @@ export default function RootLayout({
 }) {
   return (
     <html lang="zh-CN">
-      <body className="bg-warm-bg">
+      <head>
+        {/* 首帧前恢复主题/字号偏好，避免刷新时先闪默认样式（zustand persist 存储格式） */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var raw=localStorage.getItem('settings-storage');if(!raw)return;var s=JSON.parse(raw).state||{};var r=document.documentElement;['pastel','soft','warm'].forEach(function(t){r.classList.remove('theme-'+t)});r.classList.add('theme-'+(s.theme==='soft'||s.theme==='warm'?s.theme:'pastel'));r.classList.remove('font-normal','font-large','font-xlarge');r.classList.add('font-'+(s.fontSize||'normal'));if(s.highContrast)r.classList.add('high-contrast');}catch(e){}})();`,
+          }}
+        />
+      </head>
+      <body className="bg-canvas">
         <SettingsProvider>
           <NavBar />
           <CareAlertModal />

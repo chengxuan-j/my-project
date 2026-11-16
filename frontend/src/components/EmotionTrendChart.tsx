@@ -46,15 +46,15 @@ export function EmotionTrendChart({ trend }: Props) {
 
   if (data.length === 0) {
     return (
-      <div className="bg-white rounded-2xl p-8 text-center text-gray-500 border border-warm-light">
+      <div className="bg-card rounded-card p-8 text-center text-muted border border-hairline">
         这段时间还没有情绪记录 🗓
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-2xl p-4 shadow-sm border border-warm-light">
-      <h3 className="text-lg font-bold text-gray-900 mb-3">📅 每日情绪概览</h3>
+    <div className="bg-card rounded-card p-4 shadow-card border border-hairline">
+      <h3 className="text-lg font-bold text-ink mb-3">📅 每日情绪概览</h3>
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={data} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#FDE68A" />
@@ -85,7 +85,7 @@ export function EmotionTrendChart({ trend }: Props) {
           />
         </BarChart>
       </ResponsiveContainer>
-      <p className="text-sm text-gray-500 mt-3">
+      <p className="text-sm text-muted mt-3">
         每天一根柱子代表当天的平均情绪强度，颜色对应当天出现最多的情绪。
       </p>
     </div>

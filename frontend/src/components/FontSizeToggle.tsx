@@ -9,18 +9,16 @@ const OPTIONS: { value: FontSize; label: string; title: string }[] = [
 ];
 
 /**
- * 字号切换。
- *
- * 两种配色：`onPrimary` 用于橙色导航栏（默认），`onLight` 用于白色抽屉/卡片。
- * 之前只有白色文字一版，放进白底「更多」抽屉里会完全看不见。
+ * 字号切换。variant 仅为兼容旧调用点保留：导航栏与抽屉现在都是浅色底，
+ * 两种场景共用同一套样式。
  */
 export function FontSizeToggle({ variant = 'onPrimary' }: { variant?: 'onPrimary' | 'onLight' }) {
+  void variant;
   const { fontSize, setFontSize } = useSettingsStore();
-  const onLight = variant === 'onLight';
 
   return (
     <div
-      className={`flex gap-1 rounded-lg p-1 ${onLight ? 'bg-warm-light' : 'bg-white/20'}`}
+      className="flex gap-1 rounded-lg p-1 bg-primary-soft"
       role="group"
       aria-label="字号"
     >
@@ -34,13 +32,7 @@ export function FontSizeToggle({ variant = 'onPrimary' }: { variant?: 'onPrimary
             title={opt.title}
             aria-pressed={active}
             className={`min-h-[44px] min-w-[44px] rounded-md px-2 font-bold ${
-              active
-                ? onLight
-                  ? 'bg-warm-primary text-white'
-                  : 'bg-white text-warm-primary'
-                : onLight
-                  ? 'text-warm-dark hover:bg-white'
-                  : 'text-white hover:bg-white/30'
+              active ? 'bg-primary text-on-primary' : 'text-muted hover:bg-primary-softer'
             }`}
           >
             {opt.label}

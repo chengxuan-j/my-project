@@ -35,7 +35,7 @@ const EMOTION_COLOR: Record<string, string> = {
 export function EmotionInsights({ records }: { records: EmotionRecord[] }) {
   if (!records || records.length === 0) {
     return (
-      <div className="bg-white rounded-2xl p-8 text-center text-gray-500 border border-warm-light">
+      <div className="bg-card rounded-card p-8 text-center text-muted border border-hairline">
         还没有足够的数据做洞察 📊
       </div>
     );
@@ -61,8 +61,8 @@ export function EmotionInsights({ records }: { records: EmotionRecord[] }) {
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-2xl p-4 shadow-sm border border-warm-light">
-        <h3 className="text-lg font-bold text-gray-900 mb-3">🍩 情绪分布</h3>
+      <div className="bg-card rounded-card p-4 shadow-card border border-hairline">
+        <h3 className="text-lg font-bold text-ink mb-3">🍩 情绪分布</h3>
         <ResponsiveContainer width="100%" height={260}>
           <PieChart>
             <Pie
@@ -81,11 +81,11 @@ export function EmotionInsights({ records }: { records: EmotionRecord[] }) {
             <Legend wrapperStyle={{ fontSize: 14 }} />
           </PieChart>
         </ResponsiveContainer>
-        <p className="text-sm text-gray-500 mt-2">最近记录中各情绪的比例，占比最高的情绪最需要关注。</p>
+        <p className="text-sm text-muted mt-2">最近记录中各情绪的比例，占比最高的情绪最需要关注。</p>
       </div>
 
-      <div className="bg-white rounded-2xl p-4 shadow-sm border border-warm-light">
-        <h3 className="text-lg font-bold text-gray-900 mb-3">🕐 活跃时段</h3>
+      <div className="bg-card rounded-card p-4 shadow-card border border-hairline">
+        <h3 className="text-lg font-bold text-ink mb-3">🕐 活跃时段</h3>
         <ResponsiveContainer width="100%" height={240}>
           <BarChart data={hourData} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#FDE68A" />
@@ -95,7 +95,7 @@ export function EmotionInsights({ records }: { records: EmotionRecord[] }) {
             <Bar dataKey="count" fill="#F59E0B" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
-        <p className="text-sm text-gray-500 mt-2">
+        <p className="text-sm text-muted mt-2">
           柱子越高的时段，老人越常交流；这几个时段多陪陪他/她，效果最好。
         </p>
       </div>

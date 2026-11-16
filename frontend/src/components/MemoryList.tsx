@@ -20,7 +20,7 @@ interface Props {
  */
 export function MemoryList({ memories, onDelete }: Props) {
   if (!memories || memories.length === 0) {
-    return <p className="text-gray-500">还没有记忆，多和 AI 聊聊吧 🌻</p>;
+    return <p className="text-muted">还没有记忆，多和 AI 聊聊吧 🌻</p>;
   }
 
   const groups = new Map<string, MemoryItem[]>();
@@ -42,10 +42,10 @@ export function MemoryList({ memories, onDelete }: Props) {
         );
         return (
           <div key={type}>
-            <h3 className="text-base font-bold text-gray-800 mb-2 flex items-center gap-2">
+            <h3 className="text-base font-bold text-ink mb-2 flex items-center gap-2">
               <span>{memoryTypeIcon(type)}</span>
               {memoryTypeLabel(type)}
-              <span className="text-sm font-normal text-gray-500">（{items.length}）</span>
+              <span className="text-sm font-normal text-muted">（{items.length}）</span>
             </h3>
             <ul className="space-y-2">
               {items.map((m) => {
@@ -53,11 +53,11 @@ export function MemoryList({ memories, onDelete }: Props) {
                 return (
                   <li
                     key={m.id}
-                    className="flex items-start gap-3 bg-warm-light/40 rounded-xl p-4"
+                    className="flex items-start gap-3 bg-primary-softer rounded-btn p-4"
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="text-gray-900 break-words">{m.content}</p>
-                      <p className="text-sm text-gray-500 mt-1">
+                      <p className="text-ink break-words">{m.content}</p>
+                      <p className="text-sm text-muted mt-1">
                         <span title={`重要度：${importanceText(m.importance)}`}>
                           {'⭐'.repeat(stars)}
                         </span>
@@ -69,7 +69,7 @@ export function MemoryList({ memories, onDelete }: Props) {
                     {onDelete && (
                       <button
                         onClick={() => onDelete(m.id)}
-                        className="min-h-[48px] min-w-[48px] rounded-xl bg-red-100 hover:bg-red-200 text-red-600 flex items-center justify-center flex-shrink-0"
+                        className="min-h-[48px] min-w-[48px] rounded-btn bg-danger-soft hover:bg-danger hover:text-on-primary text-danger flex items-center justify-center flex-shrink-0"
                         aria-label="删除这条记忆"
                         title="删除"
                       >

@@ -3,6 +3,19 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import {
+  BookOpen,
+  Dog,
+  MessageCircle,
+  Music,
+  PenLine,
+  Phone,
+  RefreshCw,
+  Video,
+  Volume2,
+  VolumeX,
+  X,
+} from 'lucide-react';
 import { chatApi, dogApi, ApiError, recommendApi, familyMessageApi, FamilyMessageItem, FamilyPerson, memoirApi, MemoirStory, speechApi } from '@/lib/api';
 import { useServerEvents } from '@/lib/events';
 import { useAuthStore } from '@/stores/auth';
@@ -207,7 +220,7 @@ export default function ChatPage() {
   if (!hydrated || !accessToken || user?.role === 'family') {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
-        <p className="text-xl text-gray-600">加载中...</p>
+        <p className="text-xl text-muted">加载中...</p>
       </div>
     );
   }
@@ -446,40 +459,75 @@ export default function ChatPage() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 pt-4 flex flex-col app-fill-viewport">
-      {/* 顶部状态栏 */}
-      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-        <h1 className="text-2xl font-bold text-warm-primary">
-          💬 {user?.name || user?.username || '您'} 的贴心陪伴
-        </h1>
+      {/* 身份头部：谁在陪你 + 语音开关 + 打电话 */}
+      <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+        <div className="flex items-center gap-3 min-w-0">
+          <span
+            aria-hidden
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-pill bg-primary text-on-primary text-lg font-bold shadow-btn"
+          >
+            {(user?.name || user?.username || '您').slice(0, 1)}
+          </span>
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold text-ink truncate">
+              {user?.name || user?.username || '您'}
+            </h1>
+            <p className="text-sm text-muted flex items-center gap-1.5">
+              <span aria-hidden className="h-2 w-2 rounded-pill bg-success" />
+              贴心陪伴 · 在线
+            </p>
+          </div>
+        </div>
         <div className="flex items-center gap-2">
           <button
             onClick={toggleAutoTTS}
             aria-pressed={autoTTS}
-            className="min-h-[48px] px-4 rounded-xl bg-white border-2 border-warm-primary text-warm-primary font-medium"
+            className="min-h-[44px] px-3.5 rounded-btn bg-card border border-hairline-strong text-primary font-medium flex items-center gap-1.5 text-sm"
             title={autoTTS ? '关闭自动语音播报' : '开启自动语音播报'}
           >
-            {autoTTS ? '🔊 自动播报' : '🔇 静音'}
+            {autoTTS ? (
+              <>
+                <Volume2 aria-hidden className="h-4 w-4" /> 自动播报
+              </>
+            ) : (
+              <>
+                <VolumeX aria-hidden className="h-4 w-4" /> 静音
+              </>
+            )}
           </button>
+          <Link
+            href="/call"
+            className="min-h-[44px] px-3.5 rounded-btn bg-primary text-on-primary font-medium shadow-btn hover:bg-primary-strong flex items-center gap-1.5 text-sm"
+            title="进入语音通话：像打电话一样聊天，可以说方言"
+          >
+            <Phone aria-hidden className="h-4 w-4" />
+            打电话
+          </Link>
           <TTSPlayer text={autoTTS ? lastReply : null} autoPlay={!autoSpoken} />
         </div>
       </div>
 
       {/* 小狗传话：家属让机器狗说的话，实时念给老人听 */}
       {dogRelay && (
-        <div className="bg-gradient-to-r from-sky-50 to-indigo-50 border-2 border-indigo-200 rounded-2xl mb-3 p-4">
+        <div className="bg-lilac-soft rounded-card mb-3 p-4">
           <div className="flex items-start gap-3">
-            <div className="text-4xl leading-none">🐶</div>
+            <span
+              aria-hidden
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-pill bg-card text-primary"
+            >
+              <Dog className="h-6 w-6" />
+            </span>
             <div className="flex-1 min-w-0">
-              <p className="font-bold text-indigo-700 text-lg">小狗来传话啦</p>
-              <p className="text-gray-900 text-xl mt-1 break-words">{dogRelay.text}</p>
+              <p className="font-bold text-primary text-lg">小狗来传话啦</p>
+              <p className="text-ink text-xl mt-1 break-words">{dogRelay.text}</p>
               {dogRelay.relation && (
-                <p className="text-xs text-gray-500 mt-1">{dogRelay.relation} 的牵挂</p>
+                <p className="text-xs text-muted mt-1">{dogRelay.relation} 的牵挂</p>
               )}
               <div className="mt-2">
                 {dogRelay.dogSpoke ? (
-                  <p className="text-xs text-indigo-500">🐶 小狗已经把这句话念给您听啦，点下方可再听一遍：</p>
+                  <p className="text-xs text-primary">小狗已经把这句话念给您听啦，点下方可再听一遍：</p>
                 ) : (
-                  <p className="text-xs text-gray-400">正在用语音念给您听…</p>
+                  <p className="text-xs text-faint">正在用语音念给您听…</p>
                 )}
                 <div className="mt-1">
                   <TTSPlayer text={dogRelay.text} autoPlay={!dogRelay.dogSpoke} />
@@ -489,10 +537,10 @@ export default function ChatPage() {
             <button
               type="button"
               onClick={() => setDogRelay(null)}
-              className="min-h-[44px] min-w-[44px] rounded-xl bg-white text-gray-500 hover:text-gray-800 text-2xl"
+              className="min-h-[44px] min-w-[44px] rounded-btn bg-card text-muted hover:text-ink flex items-center justify-center"
               aria-label="关闭"
             >
-              ✕
+              <X aria-hidden className="h-5 w-5" />
             </button>
           </div>
         </div>
@@ -500,35 +548,35 @@ export default function ChatPage() {
 
       {/* 家人的牵挂（老人 ↔ 家属 双向） */}
       {(famInbox.length > 0 || famFamilies.length > 0) && (
-        <div className="bg-gradient-to-r from-rose-50 to-amber-50 border-2 border-rose-200 rounded-2xl mb-3">
+        <div className="bg-accent-soft rounded-card mb-3">
           <button
             type="button"
             onClick={() => setFamOpen((v) => !v)}
             className="w-full flex items-center justify-between px-4 py-3"
             aria-expanded={famOpen}
           >
-            <span className="font-bold text-gray-800">
-              💌 家人的牵挂{famUnread > 0 ? `（${famUnread} 条新）` : ''}
+            <span className="font-bold text-ink">
+              家人的牵挂{famUnread > 0 ? `（${famUnread} 条新）` : ''}
             </span>
-            <span className="text-gray-500">{famOpen ? '▲' : '▼'}</span>
+            <span className="text-muted">{famOpen ? '▲' : '▼'}</span>
           </button>
 
           {famOpen && (
             <div className="px-4 pb-4 space-y-3">
               {/* 收件箱：家人发给我的 */}
               {visibleFamInbox.length === 0 ? (
-                <p className="text-sm text-gray-500">家人还没给您留言</p>
+                <p className="text-sm text-muted">家人还没给您留言</p>
               ) : (
                 <ul className="space-y-2">
                   {visibleFamInbox.map((m) => (
                     <li
                       key={m.id}
-                      className={`bg-white/80 rounded-xl px-4 py-3 border-2 ${
-                        m.is_read ? 'border-warm-light' : 'border-rose-300'
+                      className={`bg-card rounded-btn px-4 py-3 border ${
+                        m.is_read ? 'border-hairline' : 'border-hairline-strong'
                       }`}
                     >
-                      <p className="text-gray-900 text-lg">{m.content}</p>
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-ink text-lg">{m.content}</p>
+                      <p className="text-xs text-muted mt-1">
                         {new Date(m.created_at).toLocaleString('zh-CN')}
                         {m.is_read && m.reaction ? ` · 您已回应 ${m.reaction}` : ''}
                       </p>
@@ -539,7 +587,7 @@ export default function ChatPage() {
                               key={r}
                               type="button"
                               onClick={() => handleFamRead(m.id, r)}
-                              className="min-h-[44px] min-w-[52px] rounded-xl bg-warm-light hover:bg-warm-primary text-xl"
+                              className="min-h-[44px] min-w-[52px] rounded-btn bg-primary-soft hover:bg-primary hover:text-on-primary text-xl"
                               aria-label={`回应 ${r}`}
                             >
                               {r}
@@ -554,14 +602,15 @@ export default function ChatPage() {
 
               {/* 老人给家人留言 */}
               {famFamilies.length > 0 && (
-                <div className="bg-white/70 rounded-xl p-3">
+                <div className="bg-card-soft rounded-btn p-3">
                   {!famComposeOpen ? (
                     <button
                       type="button"
                       onClick={() => setFamComposeOpen(true)}
-                      className="w-full min-h-[48px] rounded-xl bg-warm-primary text-white font-medium"
+                      className="w-full min-h-[48px] rounded-btn bg-primary text-on-primary font-medium shadow-btn flex items-center justify-center gap-1.5"
                     >
-                      ✍️ 给家人写句话
+                      <PenLine aria-hidden className="h-5 w-5" />
+                      给家人写句话
                     </button>
                   ) : (
                     <form onSubmit={handleFamSend} className="space-y-2">
@@ -569,7 +618,7 @@ export default function ChatPage() {
                         <select
                           value={famTarget}
                           onChange={(e) => setFamTarget(e.target.value)}
-                          className="w-full min-h-[48px] px-3 rounded-xl border-2 border-warm-light focus:border-warm-primary outline-none bg-white"
+                          className="w-full min-h-[48px] px-3 rounded-input border border-hairline-strong focus:border-primary outline-none bg-card"
                           aria-label="选择家人"
                         >
                           {famFamilies.map((f) => (
@@ -585,10 +634,10 @@ export default function ChatPage() {
                             key={c.value}
                             type="button"
                             onClick={() => setFamCategory(c.value)}
-                            className={`min-h-[40px] px-3 rounded-xl text-sm border-2 ${
+                            className={`min-h-[40px] px-3 rounded-btn text-sm border ${
                               famCategory === c.value
-                                ? 'bg-warm-primary text-white border-warm-primary'
-                                : 'bg-white text-gray-700 border-warm-light'
+                                ? 'bg-primary text-on-primary border-transparent'
+                                : 'bg-card text-ink border-hairline'
                             }`}
                           >
                             {c.emoji} {c.label}
@@ -600,20 +649,20 @@ export default function ChatPage() {
                         onChange={(e) => setFamContent(e.target.value)}
                         rows={2}
                         placeholder="如：孩子，我挺好的，你们别惦记～"
-                        className="w-full px-4 py-3 rounded-2xl border-2 border-warm-light focus:border-warm-primary outline-none resize-none"
+                        className="w-full px-4 py-3 rounded-input border border-hairline focus:border-primary outline-none resize-none bg-card"
                       />
                       <div className="flex gap-2">
                         <button
                           type="submit"
                           disabled={sendingFam || !famContent.trim()}
-                          className="min-h-[48px] px-5 rounded-xl bg-warm-primary text-white font-medium disabled:opacity-50"
+                          className="min-h-[48px] px-5 rounded-btn bg-primary text-on-primary font-medium shadow-btn disabled:opacity-50"
                         >
                           {sendingFam ? '发送中...' : '发送'}
                         </button>
                         <button
                           type="button"
                           onClick={() => setFamComposeOpen(false)}
-                          className="min-h-[48px] px-5 rounded-xl bg-warm-light text-gray-700"
+                          className="min-h-[48px] px-5 rounded-btn bg-primary-soft text-primary"
                         >
                           收起
                         </button>
@@ -626,12 +675,12 @@ export default function ChatPage() {
               {/* 我发出的留言 */}
               {famSent.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-medium text-gray-600 mb-1">我发给家人的</h3>
+                  <h3 className="text-sm font-medium text-muted mb-1">我发给家人的</h3>
                   <ul className="space-y-1">
                     {famSent.map((m) => (
-                      <li key={m.id} className="bg-white/60 rounded-xl px-3 py-2 text-sm">
-                        <span className="text-gray-800">{m.content}</span>
-                        <span className="text-gray-500 ml-2">
+                      <li key={m.id} className="bg-card rounded-btn px-3 py-2 text-sm">
+                        <span className="text-ink">{m.content}</span>
+                        <span className="text-muted ml-2">
                           {m.is_read ? '✅ 已看到' : '⏳ 未看到'}
                           {m.reaction ? ` · ${m.reaction}` : ''}
                         </span>
@@ -648,22 +697,22 @@ export default function ChatPage() {
       {/* 消息列表 */}
       <div
         ref={listRef}
-        className="flex-1 overflow-y-auto bg-warm-light/40 rounded-2xl p-4 mb-3"
+        className="flex-1 overflow-y-auto bg-primary-softer rounded-card p-4 mb-3"
       >
         {messages.map((m) => (
           <ChatMessage key={m.id} message={m} />
         ))}
         {sending && (
           <div className="flex justify-start mb-3">
-            <div className="bg-white rounded-2xl px-5 py-3 text-gray-500 border border-warm-light">
-              🌻 正在思考...
+            <div className="bg-card rounded-card px-5 py-3 text-muted shadow-card">
+              正在思考...
             </div>
           </div>
         )}
       </div>
 
       {error && (
-        <div className="bg-red-50 border-2 border-red-300 text-red-700 rounded-xl px-4 py-2 mb-3">
+        <div className="bg-danger-soft text-danger rounded-btn px-4 py-2 mb-3">
           {error}
         </div>
       )}
@@ -677,22 +726,30 @@ export default function ChatPage() {
 
       {/* 推荐卡片 */}
       {recommendation && (
-        <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-warm-primary rounded-2xl p-4 mb-3">
+        <div className="bg-primary-soft rounded-card p-4 mb-3">
           <div className="flex items-start justify-between gap-3">
-            <h3 className="font-bold text-warm-dark text-lg mb-1">
+            <h3 className="flex items-center gap-2 font-bold text-primary text-lg mb-1">
               {recommendation.title ||
-                (recommendation.kind === 'story'
-                  ? '📖 给您推荐这几个故事'
-                  : recommendation.kind === 'music'
-                    ? '🎵 给您推荐这几首歌'
-                    : '💡 为您推荐')}
+                (recommendation.kind === 'story' ? (
+                  <>
+                    <BookOpen aria-hidden className="h-5 w-5" />
+                    给您推荐这几个故事
+                  </>
+                ) : recommendation.kind === 'music' ? (
+                  <>
+                    <Music aria-hidden className="h-5 w-5" />
+                    给您推荐这几首歌
+                  </>
+                ) : (
+                  '为您推荐'
+                ))}
             </h3>
             <button
               onClick={() => setRecommendation(null)}
-              className="min-h-[48px] min-w-[48px] text-gray-400 hover:text-gray-700 text-2xl"
+              className="min-h-[44px] min-w-[44px] text-faint hover:text-muted flex items-center justify-center"
               aria-label="关闭推荐"
             >
-              ✕
+              <X aria-hidden className="h-5 w-5" />
             </button>
           </div>
 
@@ -700,26 +757,26 @@ export default function ChatPage() {
             <>
               <ul className="space-y-2 mt-1">
                 {recommendation.items.map((it, i) => (
-                  <li key={i} className="bg-white/70 rounded-xl px-4 py-3">
+                  <li key={i} className="bg-card rounded-btn px-4 py-3">
                     <div className="flex items-center justify-between gap-3 flex-wrap">
                       <div className="flex-1 min-w-[180px]">
-                        <p className="font-bold text-gray-900 text-lg">{it.title}</p>
+                        <p className="font-bold text-ink text-lg">{it.title}</p>
                         {it.subtitle && (
-                          <p className="text-sm text-gray-500">{it.subtitle}</p>
+                          <p className="text-sm text-muted">{it.subtitle}</p>
                         )}
-                        {it.detail && <p className="text-gray-700 mt-1">{it.detail}</p>}
+                        {it.detail && <p className="text-ink mt-1">{it.detail}</p>}
                       </div>
                       <div className="flex-shrink-0">
                         {it.speakText ? (
-                          <SpeakButton text={it.speakText} label="🔊 听一听" />
+                          <SpeakButton text={it.speakText} label="听一听" />
                         ) : it.searchUrl ? (
                           <a
                             href={it.searchUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center min-h-[48px] px-4 rounded-xl bg-warm-light hover:bg-warm-primary hover:text-white text-warm-primary font-medium"
+                            className="inline-flex items-center min-h-[48px] px-4 rounded-btn bg-primary-soft hover:bg-primary hover:text-on-primary text-primary font-medium"
                           >
-                            🎧 去收听
+                            去收听
                           </a>
                         ) : null}
                       </div>
@@ -728,31 +785,32 @@ export default function ChatPage() {
                 ))}
               </ul>
               <div className="flex items-center justify-between gap-2 mt-2 flex-wrap">
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-muted">
                   {recommendation.kind === 'story'
-                    ? '点「🔊 听一听」，用语音把故事读给您听'
-                    : '点「🎧 去收听」，在音乐平台搜索这首歌'}
+                    ? '点「听一听」，用语音把故事读给您听'
+                    : '点「去收听」，在音乐平台搜索这首歌'}
                 </p>
                 <button
                   type="button"
                   onClick={handleRefreshRecommend}
-                  className="flex-shrink-0 min-h-[40px] px-4 rounded-xl bg-white border-2 border-warm-primary text-warm-primary font-medium text-sm hover:bg-warm-primary hover:text-white"
+                  className="flex-shrink-0 min-h-[40px] px-4 rounded-btn bg-card border border-primary text-primary font-medium text-sm hover:bg-primary hover:text-on-primary flex items-center gap-1"
                 >
-                  🔄 再换一批
+                  <RefreshCw aria-hidden className="h-4 w-4" />
+                  再换一批
                 </button>
               </div>
             </>
           ) : (
             <>
-              <p className="text-gray-700">{recommendation.content}</p>
+              <p className="text-ink">{recommendation.content}</p>
               {recommendation.url && (
                 <a
                   href={recommendation.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-block mt-2 text-warm-primary underline font-medium"
+                  className="inline-block mt-2 text-primary underline font-medium"
                 >
-                  👉 点击打开
+                  点击打开
                 </a>
               )}
             </>
@@ -760,17 +818,32 @@ export default function ChatPage() {
         </div>
       )}
 
-      {/* 快捷推荐 + 拍照看看 */}
-      <div className="flex gap-2 mb-3">
-        <LargeButton variant="secondary" onClick={() => handleRecommend('music')} className="flex-1">
-          🎵 听首歌
-        </LargeButton>
-        <LargeButton variant="secondary" onClick={() => handleRecommend('story')} className="flex-1">
-          📖 听故事
-        </LargeButton>
-        <LargeButton variant="secondary" onClick={() => setCameraOpen(true)} className="flex-1">
-          🎥 指挥小狗
-        </LargeButton>
+      {/* 快捷动作条 */}
+      <div className="flex gap-2 mb-2 overflow-x-auto pb-1">
+        <button
+          type="button"
+          onClick={() => handleRecommend('music')}
+          className="flex-shrink-0 min-h-[44px] px-3.5 rounded-pill bg-primary-soft hover:bg-primary-softer text-primary font-medium text-sm flex items-center gap-1.5"
+        >
+          <Music aria-hidden className="h-4 w-4" />
+          听首歌
+        </button>
+        <button
+          type="button"
+          onClick={() => handleRecommend('story')}
+          className="flex-shrink-0 min-h-[44px] px-3.5 rounded-pill bg-primary-soft hover:bg-primary-softer text-primary font-medium text-sm flex items-center gap-1.5"
+        >
+          <BookOpen aria-hidden className="h-4 w-4" />
+          听故事
+        </button>
+        <button
+          type="button"
+          onClick={() => setCameraOpen(true)}
+          className="flex-shrink-0 min-h-[44px] px-3.5 rounded-pill bg-primary-soft hover:bg-primary-softer text-primary font-medium text-sm flex items-center gap-1.5"
+        >
+          <Video aria-hidden className="h-4 w-4" />
+          指挥小狗
+        </button>
       </div>
 
       {/* 视频动作面板：实时姿势识别 → 直接控制机器狗 */}
@@ -782,53 +855,49 @@ export default function ChatPage() {
       )}
 
       {/* 常用短语：老人打字不便，一点即发 */}
-      <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
+      <div className="flex gap-2 mb-2 overflow-x-auto pb-1">
         {QUICK_PHRASES.map((p) => (
           <button
             key={p}
             type="button"
             onClick={() => sendMessage(p)}
             disabled={sending}
-            className="flex-shrink-0 min-h-[48px] px-4 rounded-2xl bg-white border-2 border-warm-light hover:border-warm-primary text-gray-700 text-base disabled:opacity-50"
+            className="flex-shrink-0 min-h-[44px] px-4 rounded-pill bg-card border border-hairline hover:border-hairline-strong hover:text-primary text-ink text-sm disabled:opacity-50"
           >
             {p}
           </button>
         ))}
       </div>
 
-      {/* 输入区：输入框 + 大🎤按钮 */}
-      <form onSubmit={handleSubmit} className="flex items-end gap-3">
-        <div className="flex-1">
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage(input);
-              }
-            }}
-            placeholder="想说什么都可以..."
-            rows={2}
-            className="w-full px-4 py-3 rounded-2xl border-2 border-warm-primary focus:border-warm-dark outline-none resize-none text-lg"
-            aria-label="聊天输入框"
-          />
-        </div>
-        <div className="flex flex-col items-center gap-1">
-          <VoiceRecorder
-            onRecognized={(text) => sendMessage(text)}
-            onError={(msg) => setError(msg)}
-          />
-          <span className="text-xs text-gray-500">按住说话</span>
-          <Link
-            href="/call"
-            className="text-xs font-bold text-warm-dark hover:text-warm-primary underline"
-            title="进入语音通话：像打电话一样聊天，可以说方言"
-          >
-            📞 打电话
-          </Link>
-        </div>
-        <LargeButton type="submit" size="lg" disabled={sending || !input.trim()}>
+      {/* 输入卡片：输入框 + 语音 + 发送 */}
+      <form
+        onSubmit={handleSubmit}
+        className="rounded-card bg-card border border-hairline-strong shadow-card p-2.5 flex items-end gap-2.5"
+      >
+        <textarea
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              sendMessage(input);
+            }
+          }}
+          placeholder="想说什么都可以..."
+          rows={2}
+          className="flex-1 min-w-0 bg-transparent px-2.5 py-2 outline-none resize-none text-lg placeholder:text-faint"
+          aria-label="聊天输入框"
+        />
+        <VoiceRecorder
+          onRecognized={(text) => sendMessage(text)}
+          onError={(msg) => setError(msg)}
+        />
+        <LargeButton
+          type="submit"
+          size="lg"
+          disabled={sending || !input.trim()}
+          className="shrink-0"
+        >
           发送
         </LargeButton>
       </form>

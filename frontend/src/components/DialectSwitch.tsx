@@ -62,13 +62,13 @@ export function DialectSwitch() {
         }}
         aria-haspopup="dialog"
         title="让 AI 用方言和你聊天"
-        className={`min-h-[48px] px-3 rounded-lg text-base ${
+        className={`min-h-[48px] px-3 rounded-btn text-base flex items-center gap-1 ${
           state?.enabled
-            ? 'bg-white text-warm-primary font-bold'
-            : 'bg-warm-dark hover:bg-amber-700'
+            ? 'bg-primary text-on-primary font-bold shadow-btn'
+            : 'bg-primary-soft text-primary hover:bg-primary-softer font-bold'
         }`}
       >
-        {state?.enabled ? `🗣 ${state.active_dialect}` : '🗣 方言'}
+        {state?.enabled ? state.active_dialect : '方言'}
       </button>
 
       {open && (
@@ -80,20 +80,20 @@ export function DialectSwitch() {
             role="dialog"
             aria-modal="true"
             aria-label="选择方言"
-            className="w-full max-w-md bg-white rounded-3xl shadow-2xl border-2 border-warm-light overflow-hidden"
+            className="w-full max-w-md bg-card rounded-card shadow-float overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="bg-warm-primary text-white px-5 py-4 flex items-center justify-between">
+            <div className="bg-card px-5 py-4 flex items-center justify-between border-b border-hairline">
               <div>
-                <p className="text-xl font-bold">🗣 选一种方言</p>
-                <p className="text-sm text-amber-50 mt-0.5">
+                <p className="text-xl font-bold text-ink">选一种方言</p>
+                <p className="text-sm text-muted mt-0.5">
                   选好之后，AI 回你的话就用这种口语
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="min-h-[44px] min-w-[44px] rounded-lg hover:bg-warm-dark text-xl"
+                className="min-h-[44px] min-w-[44px] rounded-btn hover:bg-primary-soft text-xl text-muted"
                 aria-label="关闭"
               >
                 ✕
@@ -111,22 +111,22 @@ export function DialectSwitch() {
                       onClick={() => choose(name)}
                       disabled={!!busy}
                       aria-pressed={active}
-                      className={`w-full min-h-[56px] px-4 rounded-xl border-2 text-lg flex items-center justify-between ${
+                      className={`w-full min-h-[56px] px-4 rounded-btn border text-lg flex items-center justify-between ${
                         active
-                          ? 'border-warm-primary bg-warm-light text-warm-dark font-bold'
-                          : 'border-warm-light bg-white text-gray-800 hover:bg-warm-light/60'
+                          ? 'border-hairline-strong bg-primary-soft text-primary font-bold'
+                          : 'border-hairline bg-card text-ink hover:bg-primary-softer'
                       }`}
                     >
                       <span>
                         {name}
                         {isOff && (
-                          <span className="ml-2 text-sm font-normal text-gray-500">
+                          <span className="ml-2 text-sm font-normal text-muted">
                             不用方言
                           </span>
                         )}
                       </span>
                       {busy === name ? (
-                        <span className="text-sm text-gray-500">保存中…</span>
+                        <span className="text-sm text-muted">保存中…</span>
                       ) : (
                         active && <span aria-hidden>✓</span>
                       )}
@@ -137,11 +137,11 @@ export function DialectSwitch() {
             </ul>
 
             {error && (
-              <p className="px-5 pb-2 text-rose-600 text-sm text-center">{error}</p>
+              <p className="px-5 pb-2 text-danger text-sm text-center">{error}</p>
             )}
 
             <div className="px-5 pb-5">
-              <p className="text-sm text-gray-500 leading-relaxed">
+              <p className="text-sm text-muted leading-relaxed">
                 选好方言后：说话按方言识别（四川话、粤语、上海话等），
                 回复也用方言腔念出来。口音特别重时可以说慢一点。
               </p>
