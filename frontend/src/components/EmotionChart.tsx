@@ -68,7 +68,7 @@ export function EmotionChart({ records }: Props) {
 
   if (data.length === 0) {
     return (
-      <div className="bg-white rounded-2xl p-8 text-center text-gray-500 border border-warm-light">
+      <div className="bg-card rounded-card p-8 text-center text-muted border border-hairline">
         还没有情绪记录，先和 AI 聊聊天吧 💬
       </div>
     );
@@ -78,8 +78,8 @@ export function EmotionChart({ records }: Props) {
   const usedEmotions = Array.from(new Set(data.map((d) => d.emotion)));
 
   return (
-    <div className="bg-white rounded-2xl p-4 shadow-sm border border-warm-light">
-      <h3 className="text-lg font-bold text-gray-900 mb-3">📈 情绪强度趋势</h3>
+    <div className="bg-card rounded-card p-4 shadow-card border border-hairline">
+      <h3 className="text-lg font-bold text-ink mb-3">📈 情绪强度趋势</h3>
       <ResponsiveContainer width="100%" height={300}>
         <LineChart data={data} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#FDE68A" />
@@ -125,7 +125,7 @@ export function EmotionChart({ records }: Props) {
       {/* 情绪颜色图例 */}
       <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3">
         {usedEmotions.map((e) => (
-          <span key={e} className="inline-flex items-center gap-1.5 text-sm text-gray-600">
+          <span key={e} className="inline-flex items-center gap-1.5 text-sm text-muted">
             <span
               className="inline-block w-3 h-3 rounded-full"
               style={{ backgroundColor: EMOTION_COLOR[e] || '#9CA3AF' }}

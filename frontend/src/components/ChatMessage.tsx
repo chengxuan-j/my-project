@@ -94,17 +94,17 @@ export function ChatMessage({ message }: { message: Message }) {
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-3`}>
       <div
-        className={`max-w-[80%] rounded-2xl px-5 py-3 shadow-sm leading-relaxed ${
+        className={`max-w-[80%] rounded-card px-5 py-3 shadow-card leading-relaxed ${
           isUser
-            ? 'bg-warm-primary text-white rounded-br-sm'
+            ? 'bg-primary text-on-primary rounded-br-sm'
             : isRisk
-              ? 'bg-red-50 text-gray-900 border-2 border-red-400 rounded-bl-sm'
-              : 'bg-white text-gray-900 border border-warm-light rounded-bl-sm'
+              ? 'bg-danger-soft text-ink rounded-bl-sm'
+              : 'bg-card text-ink rounded-bl-sm'
         }`}
       >
         {!isUser && (
-          <div className="text-sm mb-1 opacity-70 flex items-center gap-2">
-            <span>🌻 陪伴 AI</span>
+          <div className="text-sm mb-1 opacity-70 flex items-center gap-1.5">
+            <span className="font-medium text-primary">陪伴 AI</span>
             {emoji && <span title={`情绪: ${message.emotion}`}>{emoji}</span>}
           </div>
         )}
@@ -112,11 +112,11 @@ export function ChatMessage({ message }: { message: Message }) {
 
         {/* 决策链：AI 为什么这么说（可折叠） */}
         {showChain && (
-          <details className="mt-2 border-t border-warm-light pt-2">
-            <summary className="cursor-pointer select-none text-warm-primary font-medium text-sm">
-              🌻 我为什么这么说
+          <details className="mt-2 border-t border-hairline pt-2">
+            <summary className="cursor-pointer select-none text-primary font-medium text-sm">
+              我为什么这么说
             </summary>
-            <div className="mt-2 space-y-1 text-sm text-gray-700">
+            <div className="mt-2 space-y-1 text-sm text-ink">
               {message.emotion && (
                 <div>
                   💗 我感觉到你：{EMOTION_LABEL[message.emotion] || message.emotion}{' '}
@@ -144,7 +144,7 @@ export function ChatMessage({ message }: { message: Message }) {
                     {message.recalledMemories.map((m, i) => (
                       <span
                         key={i}
-                        className="px-2 py-0.5 bg-warm-light rounded-lg text-xs text-gray-700"
+                        className="px-2 py-0.5 bg-primary-soft rounded-pill text-xs text-primary"
                       >
                         {m}
                       </span>

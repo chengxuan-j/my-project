@@ -9,12 +9,12 @@ import {
 } from '@/lib/api';
 
 const LEVEL_CLS: Record<string, string> = {
-  green: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  amber: 'bg-amber-50 text-amber-700 border-amber-200',
-  orange: 'bg-orange-50 text-orange-700 border-orange-200',
-  red: 'bg-rose-50 text-rose-700 border-rose-200',
-  blue: 'bg-sky-50 text-sky-700 border-sky-200',
-  gray: 'bg-gray-50 text-gray-600 border-gray-200',
+  green: 'bg-success-soft text-success border-hairline',
+  amber: 'bg-warning-soft text-warning border-hairline',
+  orange: 'bg-warning-soft text-warning border-hairline',
+  red: 'bg-accent-soft text-danger border-hairline',
+  blue: 'bg-lilac-soft text-primary border-hairline',
+  gray: 'bg-card-soft text-muted border-hairline',
 };
 
 function fmt(iso: string): string {
@@ -32,7 +32,7 @@ function fmt(iso: string): string {
 function RecordRow({ r }: { r: HealthRecordItem }) {
   return (
     <li className="py-2 flex items-center justify-between gap-3 flex-wrap">
-      <span className="text-gray-700">
+      <span className="text-ink">
         {fmt(r.measured_at)} · {r.record_label}
         {r.record_type === 'blood_pressure'
           ? ` ${r.systolic}/${r.diastolic} mmHg`
@@ -84,39 +84,39 @@ export function FamilyCarePanel({
   }, [elderlyId]);
 
   if (loading) {
-    return <p className="text-gray-500 py-6">正在加载{elderlyName}的健康关怀…</p>;
+    return <p className="text-muted py-6">正在加载{elderlyName}的健康关怀…</p>;
   }
 
   return (
     <section className="space-y-4">
       {/* 概览 */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="bg-white rounded-2xl border-2 border-warm-light p-4">
-          <p className="text-sm text-gray-500">近 7 天吃药</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">
+        <div className="bg-card rounded-card border border-hairline p-4">
+          <p className="text-sm text-muted">近 7 天吃药</p>
+          <p className="text-2xl font-bold text-ink mt-1">
             {health?.adherence.rate == null
               ? '—'
               : `${Math.round(health.adherence.rate * 100)}%`}
           </p>
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-muted mt-1">
             {health
               ? `确认 ${health.adherence.acknowledged}/${health.adherence.expected} 次`
               : '暂无计划'}
           </p>
         </div>
-        <div className="bg-white rounded-2xl border-2 border-warm-light p-4">
-          <p className="text-sm text-gray-500">现在待办</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{health?.due.length ?? 0}</p>
-          <p className="text-xs text-gray-500 mt-1">药 / 复诊提醒未确认</p>
+        <div className="bg-card rounded-card border border-hairline p-4">
+          <p className="text-sm text-muted">现在待办</p>
+          <p className="text-2xl font-bold text-ink mt-1">{health?.due.length ?? 0}</p>
+          <p className="text-xs text-muted mt-1">药 / 复诊提醒未确认</p>
         </div>
-        <div className="bg-white rounded-2xl border-2 border-warm-light p-4">
-          <p className="text-sm text-gray-500">最近血压</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">
+        <div className="bg-card rounded-card border border-hairline p-4">
+          <p className="text-sm text-muted">最近血压</p>
+          <p className="text-2xl font-bold text-ink mt-1">
             {health?.latest_blood_pressure
               ? `${health.latest_blood_pressure.systolic}/${health.latest_blood_pressure.diastolic}`
               : '—'}
           </p>
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-muted mt-1">
             {health?.latest_blood_pressure
               ? `${health.latest_blood_pressure.level.label} · ${fmt(
                   health.latest_blood_pressure.measured_at
@@ -124,12 +124,12 @@ export function FamilyCarePanel({
               : '还没有记录'}
           </p>
         </div>
-        <div className="bg-white rounded-2xl border-2 border-warm-light p-4">
-          <p className="text-sm text-gray-500">在吃的药</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">
+        <div className="bg-card rounded-card border border-hairline p-4">
+          <p className="text-sm text-muted">在吃的药</p>
+          <p className="text-2xl font-bold text-ink mt-1">
             {health?.medications.length ?? 0}
           </p>
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-muted mt-1">
             {health?.appointments.length
               ? `近期待复诊 ${health.appointments.length} 次`
               : '近期没有复诊'}
@@ -138,9 +138,9 @@ export function FamilyCarePanel({
       </div>
 
       {health && health.due.length > 0 && (
-        <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4">
-          <p className="font-bold text-gray-900">⏰ 现在有待办</p>
-          <ul className="mt-2 space-y-1 text-gray-700">
+        <div className="bg-warning-soft border border-hairline rounded-card p-4">
+          <p className="font-bold text-ink">⏰ 现在有待办</p>
+          <ul className="mt-2 space-y-1 text-ink">
             {health.due.map((d) => (
               <li key={d.key}>
                 {d.kind === 'medication' ? '💊 ' : '🏥 '}
@@ -154,18 +154,18 @@ export function FamilyCarePanel({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* 用药与复诊 */}
-        <div className="bg-white rounded-2xl border-2 border-warm-light p-5">
-          <h3 className="text-lg font-bold text-gray-900">💊 用药与复诊</h3>
+        <div className="bg-card rounded-card border border-hairline p-5">
+          <h3 className="text-lg font-bold text-ink">💊 用药与复诊</h3>
           {!health || (health.medications.length === 0 && health.appointments.length === 0) ? (
-            <p className="text-gray-500 mt-2">还没有记录。</p>
+            <p className="text-muted mt-2">还没有记录。</p>
           ) : (
             <>
               {health.medications.length > 0 && (
                 <ul className="mt-3 space-y-2">
                   {health.medications.map((m) => (
-                    <li key={m.id} className="text-gray-800">
+                    <li key={m.id} className="text-ink">
                       <span className="font-medium">{m.name}</span>
-                      <span className="text-sm text-gray-500 ml-2">
+                      <span className="text-sm text-muted ml-2">
                         {[m.times.join('、'), m.dosage, m.note].filter(Boolean).join(' · ')}
                       </span>
                     </li>
@@ -173,11 +173,11 @@ export function FamilyCarePanel({
                 </ul>
               )}
               {health.appointments.length > 0 && (
-                <ul className="mt-3 pt-3 border-t border-warm-light space-y-2">
+                <ul className="mt-3 pt-3 border-t border-hairline space-y-2">
                   {health.appointments.map((a) => (
-                    <li key={a.id} className="text-gray-800">
+                    <li key={a.id} className="text-ink">
                       🏥 <span className="font-medium">{a.title}</span>
-                      <span className="text-sm text-gray-500 ml-2">
+                      <span className="text-sm text-muted ml-2">
                         {[fmt(a.appointment_at), a.hospital, a.department]
                           .filter(Boolean)
                           .join(' · ')}
@@ -191,10 +191,10 @@ export function FamilyCarePanel({
         </div>
 
         {/* 血压等记录 */}
-        <div className="bg-white rounded-2xl border-2 border-warm-light p-5">
-          <h3 className="text-lg font-bold text-gray-900">🩺 最近记录</h3>
+        <div className="bg-card rounded-card border border-hairline p-5">
+          <h3 className="text-lg font-bold text-ink">🩺 最近记录</h3>
           {!health || health.records.length === 0 ? (
-            <p className="text-gray-500 mt-2">老人还没有记录过。</p>
+            <p className="text-muted mt-2">老人还没有记录过。</p>
           ) : (
             <ul className="mt-2 divide-y divide-warm-light">
               {health.records.slice(0, 6).map((r) => (
@@ -206,30 +206,30 @@ export function FamilyCarePanel({
       </div>
 
       {/* 时光信笺 */}
-      <div className="bg-white rounded-2xl border-2 border-warm-light p-5">
+      <div className="bg-card rounded-card border border-hairline p-5">
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <h3 className="text-lg font-bold text-gray-900">💌 老人写下的时光信笺</h3>
+          <h3 className="text-lg font-bold text-ink">💌 老人写下的时光信笺</h3>
           {scheduledCount > 0 && (
-            <span className="text-sm text-gray-500">
+            <span className="text-sm text-muted">
               还有 {scheduledCount} 封写给家人的信，没到日子
             </span>
           )}
         </div>
         {letters.length === 0 ? (
-          <p className="text-gray-500 mt-2">
+          <p className="text-muted mt-2">
             还没有可看的信。只显示老人明确写了"家人也能看"、且已经到日子的信。
           </p>
         ) : (
           <ul className="mt-3 space-y-3">
             {letters.map((l) => (
-              <li key={l.id} className="rounded-xl bg-warm-light/30 border border-warm-light p-4">
-                <p className="font-bold text-gray-900">
+              <li key={l.id} className="rounded-btn bg-primary-softer border border-hairline p-4">
+                <p className="font-bold text-ink">
                   {l.title || '一封信'}
-                  <span className="ml-2 text-sm font-normal text-gray-500">
+                  <span className="ml-2 text-sm font-normal text-muted">
                     写给{l.recipient_name || '家人'} · {fmt(l.deliver_at)} 打开
                   </span>
                 </p>
-                <p className="mt-2 text-gray-800 whitespace-pre-wrap leading-relaxed">
+                <p className="mt-2 text-ink whitespace-pre-wrap leading-relaxed">
                   {l.content}
                 </p>
               </li>

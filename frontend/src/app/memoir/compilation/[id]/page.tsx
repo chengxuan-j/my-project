@@ -3,8 +3,10 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { ArrowLeft, Clapperboard, Trash2 } from 'lucide-react';
 import { ApiError, CompilationItem, memoirApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth';
+import { PageHeader } from '@/components/ui/PageHeader';
 import {
   PromptCopyButton,
   StoryboardPlayer,
@@ -64,35 +66,45 @@ export default function CompilationPage() {
   return (
     <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <Link href="/book?tab=memoir" className="text-warm-primary min-h-[48px] flex items-center">
-          ← 回到回忆录
+        <Link href="/book?tab=memoir" className="text-primary min-h-[44px] flex items-center gap-1.5 text-sm font-medium">
+          <ArrowLeft aria-hidden className="h-4 w-4" />
+          回到素材库
         </Link>
         {comp && (
           <div className="flex items-center gap-2">
             <PromptCopyButton compilation={comp} />
             <button
               onClick={handleDelete}
-              className="min-h-[48px] px-4 rounded-xl bg-white border-2 border-red-300 text-red-600 hover:bg-red-50"
+              className="min-h-[44px] px-4 rounded-btn bg-card border border-hairline text-danger hover:bg-danger-soft flex items-center gap-1.5 text-sm font-medium"
             >
+              <Trash2 aria-hidden className="h-4 w-4" />
               删掉这段
             </button>
           </div>
         )}
       </div>
 
+      {comp && (
+        <PageHeader
+          eyebrow="回忆短片"
+          title={comp.title || '一段回忆短片'}
+          description="这里只有文字稿和画面提示词，本系统不替您生成画面。"
+          icon={<Clapperboard aria-hidden className="h-7 w-7 text-primary" />}
+        />
+      )}
+
       {error && (
-        <p className="rounded-xl bg-red-50 border border-red-200 text-red-700 p-4">{error}</p>
+        <p className="rounded-btn bg-danger-soft text-danger p-4">{error}</p>
       )}
       {loading ? (
-        <p className="text-gray-500 text-lg">正在整理……</p>
+        <p className="text-muted text-lg">正在整理……</p>
       ) : comp ? (
         <>
           <StoryboardPlayer compilation={comp} />
-          <hr className="border-amber-200" />
+          <hr className="border-hairline" />
           <StoryboardSceneList compilation={comp} />
-          <p className="text-sm text-gray-500 leading-relaxed">
-            这里只有文字稿和画面提示词。想变成真正的短片，可以把上面的提示词复制到
-            您常用的视频工具里自己做——本系统不替您生成画面。
+          <p className="text-sm text-muted leading-relaxed">
+            想变成真正的短片，可以把上面的提示词复制到您常用的视频工具里自己做。
           </p>
         </>
       ) : null}

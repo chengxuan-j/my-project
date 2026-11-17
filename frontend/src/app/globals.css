@@ -4,18 +4,230 @@
 
 :root {
   --font-size-base: 18px;
-  /* 底部 TabBar 高度：桌面端无 tab=0，移动端固定占位（2026-11-05） */
-  --tab-h: 0px;
+
+  /* 顶部导航真实高度：NavBar 用 ResizeObserver 实时写回这里。
+     字号放大 / 菜单换行都会改变它，页面高度必须跟着变，不能再写死 72px。 */
+  --app-header-h: 72px;
+  /* 手机底部 TabBar 高度，桌面为 0；手机端含 iOS 底部安全区 */
+  --app-tabbar-h: 0px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  /* ============================================================
+     语义设计令牌 —— 页面一律用语义类（bg-canvas / bg-card / text-ink …），
+     主题（theme-pastel / theme-soft / theme-warm）只改这里的变量值。
+     默认主题：pastel-ui（暖奶油粉彩，源自 stylekit.top，MIT）。
+     ============================================================ */
+
+  /* 表面 */
+  --canvas: #fff8f0;            /* 页面底 */
+  --card: #ffffff;              /* 卡片与浮层 */
+  --card-soft: #fffdf9;         /* 次级卡片 / 输入底 */
+
+  /* 文字 */
+  --ink: #332d3d;               /* 标题与正文 */
+  --muted: #6b5f80;             /* 次级文字（≥4.5:1 on card） */
+  --faint: #a89bb8;             /* 占位符 / 最弱提示 */
+
+  /* 主色：深紫（pastel-ui 唯一能承载文字的深彩） */
+  --primary: #66508f;
+  --primary-strong: #564378;    /* hover / active 加深 */
+  --on-primary: #ffffff;
+  --primary-soft: rgba(102, 80, 143, 0.1);   /* 10% 主色底：chip / 图标底 */
+  --primary-softer: rgba(102, 80, 143, 0.06);
+
+  /* 功能色（按主题微调，保证可读性） */
+  --success: #2f8f6b;
+  --success-soft: rgba(203, 239, 223, 0.55);
+  --danger: #c14d44;
+  --danger-soft: rgba(255, 181, 167, 0.45);
+  --warning: #b98a1f;
+  --warning-soft: rgba(255, 228, 154, 0.5);
+  --accent: #b3574a;            /* 情感强调（珊瑚的深色可读版） */
+  --accent-soft: rgba(255, 181, 167, 0.4);
+  --lilac: #d9c7ff;
+  --lilac-soft: rgba(217, 199, 255, 0.45);
+  --mint: #cbefdf;
+  --butter: #ffe49a;
+  --coral: #ffb5a7;
+
+  /* 描边与焦点 */
+  --hairline: rgba(102, 80, 143, 0.14);      /* 1px 柔描边，替代 border-2 */
+  --hairline-strong: rgba(102, 80, 143, 0.3);
+  --ring: rgba(255, 181, 167, 0.45);          /* focus 环（coral 40%） */
+
+  /* 阴影（彩色柔影，不使用纯黑） */
+  --shadow-card: 0 4px 16px rgba(102, 80, 143, 0.08);
+  --shadow-card-hover: 0 10px 28px rgba(102, 80, 143, 0.16);
+  --shadow-btn: 0 6px 16px rgba(102, 80, 143, 0.2);
+  --shadow-float: 0 -8px 32px rgba(102, 80, 143, 0.14);
+
+  /* 圆角 */
+  --radius-card: 24px;
+  --radius-btn: 16px;
+  --radius-input: 16px;
+
+  /* 字体 */
+  --font-body: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans SC', 'Segoe UI', sans-serif;
+  --font-display: var(--font-body);
+
+  /* 导航层 */
+  --nav-bg: #fffdf9;
+  --nav-ink: #66508f;
+  --nav-muted: #6b5f80;
+
+  /* 通话页（跟随主题的沉浸界面） */
+  --call-bg: radial-gradient(120% 85% at 50% 0%, #efe7ff 0%, #f7f3ff 45%, #fff8f0 100%);
+  --call-ink: #332d3d;
+  --call-muted: rgba(51, 45, 61, 0.72);
+  --call-faint: rgba(51, 45, 61, 0.5);
+  --call-surface: rgba(102, 80, 143, 0.07);
+  --call-surface-strong: rgba(102, 80, 143, 0.13);
+  --call-accent: #66508f;
+  --call-accent-ink: #ffffff;
+  --call-accent-soft: rgba(102, 80, 143, 0.2);
+  --call-accent-softer: rgba(102, 80, 143, 0.1);
+  --call-border: rgba(102, 80, 143, 0.16);
 }
 
+/* ============ 主题 2：soft-ui（雾白 + 靛蓝，低饱和大圆角） ============ */
+html.theme-soft {
+  --canvas: #f1f5f9;
+  --card: #ffffff;
+  --card-soft: #f8fafc;
+
+  --ink: #1f2937;
+  --muted: #64748b;
+  --faint: #94a3b8;
+
+  --primary: #6366f1;
+  --primary-strong: #4f46e5;
+  --on-primary: #ffffff;
+  --primary-soft: rgba(99, 102, 241, 0.1);
+  --primary-softer: rgba(99, 102, 241, 0.06);
+
+  --success: #10b981;
+  --success-soft: rgba(16, 185, 129, 0.12);
+  --danger: #ef4444;
+  --danger-soft: rgba(239, 68, 68, 0.1);
+  --warning: #f59e0b;
+  --warning-soft: rgba(245, 158, 11, 0.12);
+  --accent: #ec4899;
+  --accent-soft: rgba(236, 72, 153, 0.12);
+  --lilac: #e0e7ff;
+  --lilac-soft: rgba(224, 231, 255, 0.6);
+  --mint: #d1fae5;
+  --butter: #fef3c7;
+  --coral: #fecdd3;
+
+  --hairline: rgba(100, 116, 139, 0.14);
+  --hairline-strong: rgba(100, 116, 139, 0.28);
+  --ring: rgba(99, 102, 241, 0.25);
+
+  --shadow-card: 0 12px 32px rgba(148, 163, 184, 0.25);
+  --shadow-card-hover: 0 24px 48px rgba(99, 102, 241, 0.2);
+  --shadow-btn: 0 10px 24px rgba(99, 102, 241, 0.25);
+  --shadow-float: 0 -12px 40px rgba(148, 163, 184, 0.2);
+
+  --radius-card: 24px;
+  --radius-btn: 16px;
+  --radius-input: 16px;
+
+  --font-display: var(--font-body);
+
+  --nav-bg: #ffffff;
+  --nav-ink: #4f46e5;
+  --nav-muted: #64748b;
+
+  /* 通话页 */
+  --call-bg: radial-gradient(120% 85% at 50% 0%, #e8edff 0%, #f4f7ff 45%, #f1f5f9 100%);
+  --call-ink: #1f2937;
+  --call-muted: #475569;
+  --call-faint: #64748b;
+  --call-surface: rgba(99, 102, 241, 0.08);
+  --call-surface-strong: rgba(99, 102, 241, 0.14);
+  --call-accent: #6366f1;
+  --call-accent-ink: #ffffff;
+  --call-accent-soft: rgba(99, 102, 241, 0.22);
+  --call-accent-softer: rgba(99, 102, 241, 0.12);
+  --call-border: rgba(100, 116, 139, 0.2);
+}
+
+/* ============ 主题 3：warm-organic（赤陶陶土，8px 圆角，衬线标题） ============ */
+html.theme-warm {
+  --canvas: #f5f0eb;
+  --card: #e8ded1;
+  --card-soft: #efe7dc;
+
+  --ink: #2d2a24;
+  --muted: #5d5749;
+  --faint: #8f8674;
+
+  --primary: #c86a4a;
+  --primary-strong: #b25c3e;
+  --on-primary: #fff8f0;
+  --primary-soft: rgba(200, 106, 74, 0.12);
+  --primary-softer: rgba(200, 106, 74, 0.07);
+
+  --success: #7a8b5e;
+  --success-soft: rgba(122, 139, 94, 0.15);
+  --danger: #b3413a;
+  --danger-soft: rgba(179, 65, 58, 0.12);
+  --warning: #b98a1f;
+  --warning-soft: rgba(212, 191, 165, 0.4);
+  --accent: #7a8b5e;
+  --accent-soft: rgba(122, 139, 94, 0.18);
+  --lilac: #d4bfa5;
+  --lilac-soft: rgba(212, 191, 165, 0.45);
+  --mint: #cfd9bd;
+  --butter: #e3d3ab;
+  --coral: #dba18f;
+
+  --hairline: rgba(212, 191, 165, 0.6);
+  --hairline-strong: rgba(180, 155, 120, 0.8);
+  --ring: rgba(200, 106, 74, 0.25);
+
+  --shadow-card: 0 6px 20px rgba(45, 42, 36, 0.06);
+  --shadow-card-hover: 0 12px 32px rgba(45, 42, 36, 0.1);
+  --shadow-btn: 0 6px 20px rgba(45, 42, 36, 0.06);
+  --shadow-float: 0 -8px 32px rgba(45, 42, 36, 0.08);
+
+  --radius-card: 8px;
+  --radius-btn: 8px;
+  --radius-input: 8px;
+
+  --font-display: Georgia, 'Songti SC', 'STSong', 'SimSun', serif;
+
+  --nav-bg: #e8ded1;
+  --nav-ink: #b25c3e;
+  --nav-muted: #5d5749;
+
+  /* 通话页 */
+  --call-bg: radial-gradient(120% 85% at 50% 0%, #ecdfd0 0%, #f2e9dd 45%, #f5f0eb 100%);
+  --call-ink: #2d2a24;
+  --call-muted: rgba(45, 42, 36, 0.72);
+  --call-faint: rgba(45, 42, 36, 0.5);
+  --call-surface: rgba(200, 106, 74, 0.1);
+  --call-surface-strong: rgba(200, 106, 74, 0.17);
+  --call-accent: #c86a4a;
+  --call-accent-ink: #fff8f0;
+  --call-accent-soft: rgba(200, 106, 74, 0.22);
+  --call-accent-softer: rgba(200, 106, 74, 0.12);
+  --call-border: rgba(180, 155, 120, 0.4);
+}
+
+/* 手机：顶栏只留一行（logo + 更多），导航移到底部 TabBar */
 @media (max-width: 767px) {
   :root {
-    --tab-h: 60px;
+    --app-header-h: 60px;
+    --app-tabbar-h: calc(60px + var(--safe-bottom));
   }
 }
 
 html {
   font-size: var(--font-size-base);
+  /* 兜底：个别组件超宽时不该让整页横向滚动，把导航推出屏幕外 */
+  overflow-x: hidden;
 }
 
 html.font-large {
@@ -27,12 +239,105 @@ html.font-xlarge {
 }
 
 body {
-  background-color: #FFFBEB;
-  color: #1F2937;
+  background-color: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-body);
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+
+/* 标题字体随主题：pastel/soft 用无衬线，warm 用衬线（Lora 风格的中文替代栈） */
+h1, h2, h3 {
+  font-family: var(--font-display);
+}
+
+/* ============ 通话页：跟随主题的沉浸界面 ============ */
+.call-screen {
+  background: var(--call-bg);
+  color: var(--call-ink);
+}
+.call-ink { color: var(--call-ink); }
+.call-muted { color: var(--call-muted); }
+.call-faint { color: var(--call-faint); }
+.call-glass { background: var(--call-surface); }
+.call-glass-strong { background: var(--call-surface-strong); }
+.call-glass-hover:hover { background: var(--call-surface-strong); }
+.call-accent {
+  background: var(--call-accent);
+  color: var(--call-accent-ink);
+}
+.call-accent-hover:hover { filter: brightness(1.07); }
+.call-ring { background: var(--call-accent-soft); }
+.call-ring-2 { background: var(--call-accent-softer); }
+.call-border { border-color: var(--call-border); }
+
+
+/* 主题切换时颜色平滑过渡（属性变化、不常驻动画） */
+@media (prefers-reduced-motion: no-preference) {
+  body,
+  body * {
+    transition-property: background-color, border-color, color, box-shadow;
+    transition-duration: 240ms;
+    transition-timing-function: ease-out;
+  }
+}
+
+/**
+ * 页面主容器：常规滚动页面在底部留出 TabBar 的位置，否则最后一屏内容会被挡住。
+ * 桌面端 --app-tabbar-h 为 0，等价于原来的 pb-8。
+ */
+.app-main {
+  padding-bottom: calc(2rem + var(--app-tabbar-h));
+}
+
+/* 背景色要一直铺到屏幕底部的页面（如通话页），用负 margin 抵掉上面的留白 */
+.app-main-bleed {
+  margin-bottom: calc(-2rem - var(--app-tabbar-h));
+}
+
+/**
+ * 铺满可视区的页面容器（聊天、通话这类不能整页滚动的页面）。
+ *
+ * 减去顶栏 + 底部 TabBar + main 的上下留白，剩下的正好是一屏。
+ * 首选 dvh：移动端地址栏收起/键盘弹出时 100vh 不会变，用 vh 会被挡住。
+ */
+.app-fill-viewport {
+  height: calc(100vh - var(--app-header-h) - var(--app-tabbar-h) - 2rem);
+}
+
+@supports (height: 100dvh) {
+  .app-fill-viewport {
+    height: calc(100dvh - var(--app-header-h) - var(--app-tabbar-h) - 2rem);
+  }
+}
+
+/**
+ * 同上，但配合 .app-main-bleed 使用：main 的底部留白已经被负 margin 抵消，
+ * 所以这里不再减那 2rem，让深色背景正好铺到 TabBar 上沿。
+ */
+.app-fill-viewport-bleed {
+  height: calc(100vh - var(--app-header-h) - var(--app-tabbar-h));
+}
+
+@supports (height: 100dvh) {
+  .app-fill-viewport-bleed {
+    height: calc(100dvh - var(--app-header-h) - var(--app-tabbar-h));
+  }
+}
+
+/* 登录/注册这类不显示导航的页面：铺满一屏即可，dvh 优先、vh 兜底 */
+.app-min-screen {
   min-height: 100vh;
 }
 
-/* 高对比度模式：黑底黄字 */
+@supports (height: 100dvh) {
+  .app-min-screen {
+    min-height: 100dvh;
+  }
+}
+
+/* ============ 高对比度模式（无障碍）：黑底黄字，优先级最高 ============ */
 html.high-contrast body {
   background-color: #000;
   color: #FFEB3B;
@@ -52,16 +357,56 @@ html.high-contrast select {
   border-color: #FFEB3B !important;
 }
 
-html.high-contrast .bg-white,
-html.high-contrast .bg-warm-bg,
-html.high-contrast .bg-warm-light {
+html.high-contrast .bg-card,
+html.high-contrast .bg-canvas,
+html.high-contrast .bg-card-soft,
+html.high-contrast .bg-primary-soft,
+html.high-contrast .bg-lilac,
+html.high-contrast .bg-mint,
+html.high-contrast .bg-butter,
+html.high-contrast .bg-coral,
+html.high-contrast .bg-white {
   background-color: #111 !important;
   color: #FFEB3B !important;
 }
 
+html.high-contrast .text-ink,
+html.high-contrast .text-muted,
+html.high-contrast .text-faint,
+html.high-contrast .text-primary,
+html.high-contrast .text-accent,
+html.high-contrast .text-success,
+html.high-contrast .text-danger,
+html.high-contrast .text-warning,
 html.high-contrast .text-gray-900,
 html.high-contrast .text-gray-700,
 html.high-contrast .text-gray-600,
 html.high-contrast .text-gray-500 {
   color: #FFEB3B !important;
+}
+
+/* 高对比下主色按钮反白成黄底黑字 */
+html.high-contrast .bg-primary,
+html.high-contrast .bg-primary-strong {
+  background-color: #FFEB3B !important;
+  color: #000 !important;
+}
+
+/* 高对比：通话页 */
+html.high-contrast .call-screen {
+  background: #000 !important;
+  color: #FFEB3B !important;
+}
+html.high-contrast .call-ink,
+html.high-contrast .call-muted,
+html.high-contrast .call-faint {
+  color: #FFEB3B !important;
+}
+html.high-contrast .call-glass,
+html.high-contrast .call-glass-strong {
+  background: #111 !important;
+}
+html.high-contrast .call-accent {
+  background: #FFEB3B !important;
+  color: #000 !important;
 }

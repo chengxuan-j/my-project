@@ -2,10 +2,15 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Activity, Archive, BookHeart, Clock, Dog, Home, Mail, MessagesSquare, Music, ShieldCheck, Sparkles, Timer, UserPlus, UserRound, Users } from 'lucide-react';
 import { familyApi, dogApi, ApiError, ElderlyItem, EmotionRecord, MemoryItem, FamilyAlert, EmotionTrendDay, FamilyMessageItem, familyMessageApi, DigestPayload, ChatRhythm, CareIndex, MemoryGraph, MemoirPipelineData, CareSignals, DogLog } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth';
 import { useServerEvents } from '@/lib/events';
 import { LargeButton } from '@/components/LargeButton';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { StatCard } from '@/components/ui/StatCard';
+import { Badge } from '@/components/ui/Badge';
+import { SectionCard } from '@/components/ui/SectionCard';
 import { EmotionChart, EMOTION_LABEL } from '@/components/EmotionChart';
 import { EmotionTrendChart } from '@/components/EmotionTrendChart';
 import { EmotionInsights } from '@/components/EmotionInsights';
@@ -56,9 +61,9 @@ function DigestCard({ msg, onRead }: { msg: FamilyMessageItem; onRead: (id: numb
   const digest = parseDigest(msg.content);
   if (!digest) {
     return (
-      <li className="bg-warm-light/40 rounded-xl px-4 py-3 border-2 border-warm-light">
-        <p className="text-gray-900">{msg.content}</p>
-        <p className="text-sm text-gray-500 mt-1">
+      <li className="bg-primary-softer rounded-btn px-4 py-3 border border-hairline">
+        <p className="text-ink">{msg.content}</p>
+        <p className="text-sm text-muted mt-1">
           {new Date(msg.created_at).toLocaleString('zh-CN')}
         </p>
       </li>
@@ -68,37 +73,37 @@ function DigestCard({ msg, onRead }: { msg: FamilyMessageItem; onRead: (id: numb
   const m = digest.memoir;
   return (
     <li
-      className={`rounded-2xl px-4 py-4 border-2 ${
-        msg.is_read ? 'bg-warm-light/40 border-warm-light' : 'bg-amber-50 border-amber-300'
+      className={`rounded-card px-4 py-4 border ${
+        msg.is_read ? 'bg-primary-softer border-hairline' : 'bg-warning-soft border-hairline'
       }`}
     >
       <div className="flex items-center gap-2 mb-2">
         <span className="text-lg">📅</span>
-        <span className="font-bold text-gray-900">今日陪伴日报</span>
-        {digest.date && <span className="text-sm text-gray-500">{digest.date}</span>}
+        <span className="font-bold text-ink">今日陪伴日报</span>
+        {digest.date && <span className="text-sm text-muted">{digest.date}</span>}
         {!msg.is_read && (
-          <span className="ml-auto text-xs bg-rose-500 text-white px-2 py-0.5 rounded-full">新</span>
+          <span className="ml-auto text-xs bg-danger text-white px-2 py-0.5 rounded-full">新</span>
         )}
       </div>
       {s && (
         <div className="flex flex-wrap gap-2 mb-2">
           {s.rounds > 0 && (
-            <span className="text-xs bg-white border border-warm-light rounded-full px-2 py-1">
+            <span className="text-xs bg-card border border-hairline rounded-full px-2 py-1">
               💬 {s.rounds} 轮
             </span>
           )}
           {s.main_emotion_label && (
-            <span className="text-xs bg-white border border-warm-light rounded-full px-2 py-1">
+            <span className="text-xs bg-card border border-hairline rounded-full px-2 py-1">
               😊 {s.main_emotion_label}
             </span>
           )}
           {s.topics?.length > 0 && (
-            <span className="text-xs bg-white border border-warm-light rounded-full px-2 py-1">
+            <span className="text-xs bg-card border border-hairline rounded-full px-2 py-1">
               🏷️ {s.topics.map((t) => t.topic).join('、')}
             </span>
           )}
           {s.time_range && (
-            <span className="text-xs bg-white border border-warm-light rounded-full px-2 py-1">
+            <span className="text-xs bg-card border border-hairline rounded-full px-2 py-1">
               🕐 {s.time_range}
             </span>
           )}
@@ -108,30 +113,30 @@ function DigestCard({ msg, onRead }: { msg: FamilyMessageItem; onRead: (id: numb
       {m && (m.today > 0 || m.week > 0) && (
         <div className="flex flex-wrap gap-2 mb-2">
           {m.today > 0 && (
-            <span className="text-xs bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-full px-2 py-1">
+            <span className="text-xs bg-success-soft border border-hairline text-success rounded-full px-2 py-1">
               📖 {m.today === 1 ? '今天留下了一段新回忆' : `今天留下了 ${m.today} 段新回忆`}
             </span>
           )}
           {m.week > 0 && (
-            <span className="text-xs bg-white border border-warm-light rounded-full px-2 py-1">
+            <span className="text-xs bg-card border border-hairline rounded-full px-2 py-1">
               本周新增 {m.week} 段
             </span>
           )}
           {m.total > 0 && (
-            <span className="text-xs bg-white border border-warm-light rounded-full px-2 py-1">
+            <span className="text-xs bg-card border border-hairline rounded-full px-2 py-1">
               共 {m.total} 段
             </span>
           )}
         </div>
       )}
-      <p className="text-gray-900 leading-relaxed whitespace-pre-line">{digest.summary}</p>
+      <p className="text-ink leading-relaxed whitespace-pre-line">{digest.summary}</p>
       <div className="flex items-center justify-between mt-2">
-        <p className="text-sm text-gray-500">{new Date(msg.created_at).toLocaleString('zh-CN')}</p>
+        <p className="text-sm text-muted">{new Date(msg.created_at).toLocaleString('zh-CN')}</p>
         {!msg.is_read && (
           <button
             type="button"
             onClick={() => onRead(msg.id)}
-            className="text-sm text-warm-primary underline min-h-[36px] px-2"
+            className="text-sm text-primary underline min-h-[36px] px-2"
           >
             标为已读
           </button>
@@ -314,8 +319,8 @@ export default function FamilyPage() {
   if (user?.role !== 'family') {
     return (
       <div className="max-w-2xl mx-auto px-4 py-12 text-center">
-        <p className="text-xl text-gray-600 mb-4">👨‍👩‍👧 家属看板</p>
-        <p className="text-gray-500">此页面仅供家属账号使用</p>
+        <p className="text-xl text-muted mb-4">👨‍👩‍👧 家属看板</p>
+        <p className="text-muted">此页面仅供家属账号使用</p>
       </div>
     );
   }
@@ -538,22 +543,22 @@ export default function FamilyPage() {
   const renderAlert = (a: FamilyAlert) => {
     const sev =
       a.severity === 'high'
-        ? 'border-red-400 bg-red-50'
-        : 'border-amber-300 bg-amber-50';
+        ? 'border-danger bg-danger-soft'
+        : 'border-hairline bg-warning-soft';
     return (
-      <div key={a.id} className={`rounded-2xl border-2 p-4 ${sev}`}>
+      <div key={a.id} className={`rounded-card border p-4 ${sev}`}>
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
-            <p className="font-bold text-lg text-gray-900">{a.title}</p>
-            <p className="text-gray-700 mt-1">{a.detail}</p>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="font-bold text-lg text-ink">{a.title}</p>
+            <p className="text-ink mt-1">{a.detail}</p>
+            <p className="text-sm text-muted mt-1">
               👴 {elderNameOf(a.elderly_user_id)} ·{' '}
               {new Date(a.created_at).toLocaleString('zh-CN')}
             </p>
           </div>
           <div>
             {a.is_acknowledged ? (
-              <span className="inline-flex items-center px-3 py-2 rounded-xl bg-green-100 text-green-700 font-medium">
+              <span className="inline-flex items-center px-3 py-2 rounded-btn bg-success-soft text-success font-medium">
                 ✓ 已关注
               </span>
             ) : (
@@ -585,57 +590,63 @@ export default function FamilyPage() {
     : memories;
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-      <div className="flex items-end justify-between gap-4 flex-wrap">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-amber-600">陪伴状态中心</p>
-          <h1 className="text-3xl font-bold text-gray-900 mt-1">家属看板</h1>
-          <p className="text-gray-500 mt-1">快速了解家人的近况，把关心变成及时的陪伴。</p>
-        </div>
-        <div className="rounded-full bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700">
-          ● 系统运行正常
-        </div>
-      </div>
+    <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
+      <PageHeader
+        eyebrow="陪伴状态中心"
+        title="家属看板"
+        description="快速了解家人的近况，把关心变成及时的陪伴。"
+        icon={<Users aria-hidden className="h-7 w-7 text-primary" />}
+        actions={
+          <Badge tone="success">
+            <ShieldCheck aria-hidden className="h-3.5 w-3.5" />
+            系统运行正常
+          </Badge>
+        }
+      />
 
-      {/* 可视化总览：先用当前接口状态承载信息架构，后续逐项替换为实时指标。 */}
-      <section className="rounded-3xl bg-slate-900 p-5 sm:p-7 text-white shadow-xl">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <p className="text-sm text-slate-300">今日陪伴概览</p>
-            <h2 className="text-2xl font-bold mt-1">{elderlyList.length ? '家人的状态，值得被看见' : '开始建立陪伴档案'}</h2>
-          </div>
-          <div className="text-right">
-            <p className="text-3xl font-bold text-amber-300">{pendingAlerts.length}</p>
-            <p className="text-xs text-slate-300">待关注提醒</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-6">
-          {[
-            { label: '绑定家人', value: elderlyList.length, unit: '位', color: 'text-cyan-300' },
-            { label: '情绪趋势', value: records.length ? '稳定' : '待采集', unit: '', color: 'text-emerald-300' },
-            { label: '重要记忆', value: memories.length, unit: '条', color: 'text-violet-300' },
-            { label: '家庭互动', value: inboxMsgs.length + sentMsgs.length, unit: '次', color: 'text-amber-300' },
-          ].map((item) => (
-            <div key={item.label} className="rounded-2xl bg-white/10 p-4 backdrop-blur-sm">
-              <p className="text-sm text-slate-300">{item.label}</p>
-              <p className={`text-2xl font-bold mt-2 ${item.color}`}>{item.value}<span className="text-sm ml-1 font-medium">{item.unit}</span></p>
-            </div>
-          ))}
-        </div>
-      </section>
+      {/* 核心指标 */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatCard
+          label="绑定家人"
+          value={elderlyList.length}
+          unit="位"
+          icon={<Users aria-hidden className="h-4 w-4" />}
+        />
+        <StatCard
+          label="情绪趋势"
+          value={records.length ? '稳定' : '待采集'}
+          hint={records.length ? `近 ${records.length} 次情绪记录` : '等待老人端开始聊天'}
+          tone={records.length ? 'success' : 'ink'}
+          icon={<Activity aria-hidden className="h-4 w-4" />}
+        />
+        <StatCard
+          label="重要记忆"
+          value={memories.length}
+          unit="条"
+          icon={<BookHeart aria-hidden className="h-4 w-4" />}
+        />
+        <StatCard
+          label="家庭互动"
+          value={inboxMsgs.length + sentMsgs.length}
+          unit="次"
+          hint={pendingAlerts.length ? `${pendingAlerts.length} 条提醒待关注` : '暂无待关注提醒'}
+          tone={pendingAlerts.length ? 'warning' : 'ink'}
+          icon={<MessagesSquare aria-hidden className="h-4 w-4" />}
+        />
+      </div>
 
       {/* 家人实时情绪：老人端开着「表情识别」时，这里实时刷新 */}
       {elderlyList.some((e) => liveEmotions[e.elderly_id]) && (
-        <section className="rounded-2xl bg-white border-2 border-emerald-200 p-5 shadow-sm">
+        <section className="rounded-card bg-card border border-hairline p-5 shadow-card">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h2 className="text-xl font-bold text-gray-900">😊 家人实时情绪</h2>
-              <p className="text-sm text-gray-500 mt-1">
+              <h2 className="flex items-center gap-2 text-lg font-bold text-ink"><Activity aria-hidden className="h-5 w-5 text-success" />家人实时情绪</h2>
+              <p className="text-sm text-muted mt-1">
                 老人端摄像头表情识别开启时，情绪状态实时同步
               </p>
             </div>
-            <span className="flex items-center gap-1 text-xs font-semibold text-emerald-600">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> 实时
+            <span className="flex items-center gap-1 text-xs font-semibold text-success">
+              <span className="w-2 h-2 rounded-full bg-success animate-pulse" /> 实时
             </span>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -647,8 +658,8 @@ export default function FamilyPage() {
                 return (
                   <div
                     key={e.elderly_id}
-                    className={`rounded-xl p-4 border-2 ${
-                      negative ? 'bg-amber-50 border-amber-300' : 'bg-emerald-50 border-emerald-200'
+                    className={`rounded-btn p-4 border ${
+                      negative ? 'bg-warning-soft border-hairline' : 'bg-success-soft border-hairline'
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -656,13 +667,13 @@ export default function FamilyPage() {
                         {EMOTION_EMOJI[live.emotion] ?? '🙂'}
                       </span>
                       <div className="flex-1 min-w-0">
-                        <p className="font-bold text-gray-900">
+                        <p className="font-bold text-ink">
                           {e.name || e.username}
                         </p>
-                        <p className="text-gray-700">
+                        <p className="text-ink">
                           {live.label} · 置信度 {Math.round(live.score)}%
                         </p>
-                        <p className="text-xs text-gray-500 mt-0.5">
+                        <p className="text-xs text-muted mt-0.5">
                           更新于 {new Date(live.ts).toLocaleTimeString('zh-CN')}
                           {negative && ' · 建议打个电话关心一下'}
                         </p>
@@ -676,56 +687,73 @@ export default function FamilyPage() {
       )}
 
       <section className="grid lg:grid-cols-[1.35fr_1fr] gap-5">
-        <div className="rounded-2xl bg-white border border-slate-200 p-5 shadow-sm">
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">陪伴能力地图</h2>
-              <p className="text-sm text-gray-500 mt-1">核心能力建设进度</p>
-            </div>
-            <span className="text-sm font-semibold text-amber-600">8 项能力</span>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
+        <SectionCard
+          title="陪伴能力"
+          meta="8 项"
+          icon={<Sparkles aria-hidden className="h-5 w-5" />}
+        >
+          <div className="grid grid-cols-2 gap-2.5">
             {[
-              ['画像', '已建立', 'bg-amber-50 text-amber-700', '👤'],
-              ['短期记忆', '实时', 'bg-cyan-50 text-cyan-700', '◷'],
-              ['长期记忆', '持续积累', 'bg-violet-50 text-violet-700', '✦'],
-              ['情绪分析', '趋势跟踪', 'bg-emerald-50 text-emerald-700', '⌁'],
-              ['安全策略', pendingAlerts.length ? '需关注' : '运行中', pendingAlerts.length ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700', '⚠'],
-              ['内容推荐', '个性化', 'bg-orange-50 text-orange-700', '♫'],
-              ['家庭端', '已连接', 'bg-blue-50 text-blue-700', '⌂'],
-              ['定时任务', '规划中', 'bg-slate-100 text-slate-700', '◫'],
-            ].map(([name, status, classes, icon]) => (
-              <div key={name} className={`rounded-xl p-3 ${classes}`}>
-                <div className="flex items-center justify-between"><span className="text-xl">{icon}</span><span className="text-xs font-bold">{status}</span></div>
-                <p className="font-semibold mt-2">{name}</p>
+              { name: '画像', status: '已建立', tone: 'primary' as const, icon: UserRound },
+              { name: '短期记忆', status: '实时', tone: 'success' as const, icon: Timer },
+              { name: '长期记忆', status: '持续积累', tone: 'primary' as const, icon: Archive },
+              { name: '情绪分析', status: '趋势跟踪', tone: 'success' as const, icon: Activity },
+              {
+                name: '安全策略',
+                status: pendingAlerts.length ? '需关注' : '运行中',
+                tone: pendingAlerts.length ? ('danger' as const) : ('success' as const),
+                icon: ShieldCheck,
+              },
+              { name: '内容推荐', status: '个性化', tone: 'warning' as const, icon: Music },
+              { name: '家庭端', status: '已连接', tone: 'accent' as const, icon: Home },
+              { name: '定时任务', status: '规划中', tone: 'neutral' as const, icon: Clock },
+            ].map(({ name, status, tone, icon: Icon }) => (
+              <div key={name} className="rounded-btn bg-card-soft border border-hairline p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-pill bg-primary-soft text-primary">
+                    <Icon aria-hidden className="h-4 w-4" />
+                  </span>
+                  <Badge tone={tone}>{status}</Badge>
+                </div>
+                <p className="mt-2 text-sm font-semibold text-ink">{name}</p>
               </div>
             ))}
           </div>
-        </div>
+        </SectionCard>
 
-        <div className="rounded-2xl bg-white border border-slate-200 p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div><h2 className="text-xl font-bold text-gray-900">近 7 日情绪</h2><p className="text-sm text-gray-500 mt-1">情绪记录可视化预览</p></div>
-            <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">平稳</span>
-          </div>
-          <div className="h-40 flex items-end gap-2 mt-7 px-2">
+        <SectionCard
+          title="近 7 日情绪"
+          icon={<Activity aria-hidden className="h-5 w-5" />}
+          actions={<Badge tone="success">平稳</Badge>}
+        >
+          <div className="h-40 flex items-end gap-2 mt-2 px-1">
             {[42, 58, 48, 68, 55, 74, 63].map((height, index) => (
               <div key={index} className="flex-1 flex flex-col items-center gap-2">
-                <div className="w-full rounded-t-lg bg-gradient-to-t from-cyan-500 to-emerald-300" style={{ height: `${height}%` }} />
-                <span className="text-xs text-gray-400">{['一','二','三','四','五','六','日'][index]}</span>
+                <div className="w-full rounded-t-lg bg-primary-soft relative overflow-hidden" style={{ height: `${height}%` }}>
+                  <div className="absolute inset-x-0 bottom-0 bg-primary rounded-t-lg" style={{ height: '55%' }} />
+                </div>
+                <span className="text-xs text-faint">{['一','二','三','四','五','六','日'][index]}</span>
               </div>
             ))}
           </div>
-          <div className="mt-4 flex items-center justify-between text-sm"><span className="text-gray-500">平均情绪强度</span><strong className="text-emerald-600">68%</strong></div>
-        </div>
+          <div className="mt-4 flex items-center justify-between text-sm">
+            <span className="text-muted">平均情绪强度</span>
+            <strong className="text-primary">68%</strong>
+          </div>
+        </SectionCard>
       </section>
 
+      {/* 绑定与已绑定老人：桌面端双栏 */}
+      <div className="grid lg:grid-cols-2 gap-5 items-start">
       {/* 绑定老人 */}
-      <section className="bg-white rounded-2xl shadow-sm border-2 border-warm-light p-6">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">➕ 绑定老人</h2>
+      <section className="bg-card rounded-card shadow-card border border-hairline p-5">
+        <h2 className="flex items-center gap-2 text-lg font-bold text-ink mb-4">
+          <UserPlus aria-hidden className="h-5 w-5 text-primary" />
+          绑定老人
+        </h2>
         <form onSubmit={handleBind} className="space-y-4">
           <div>
-            <label htmlFor="bind-username" className="block mb-1 font-medium text-gray-700">
+            <label htmlFor="bind-username" className="block mb-1 font-medium text-ink">
               老人用户名
             </label>
             <input
@@ -733,12 +761,12 @@ export default function FamilyPage() {
               type="text"
               value={bindUsername}
               onChange={(e) => setBindUsername(e.target.value)}
-              className="w-full min-h-[48px] px-3 rounded-xl border-2 border-warm-light focus:border-warm-primary outline-none"
+              className="w-full min-h-[48px] px-3 rounded-btn border border-hairline focus:border-primary outline-none bg-card"
               placeholder="老人注册时用的用户名"
             />
           </div>
           <div>
-            <label htmlFor="bind-code" className="block mb-1 font-medium text-gray-700">
+            <label htmlFor="bind-code" className="block mb-1 font-medium text-ink">
               邀请码
             </label>
             <input
@@ -746,17 +774,17 @@ export default function FamilyPage() {
               type="text"
               value={inviteCode}
               onChange={(e) => setInviteCode(e.target.value)}
-              className="w-full min-h-[48px] px-3 rounded-xl border-2 border-warm-light focus:border-warm-primary outline-none"
+              className="w-full min-h-[48px] px-3 rounded-btn border border-hairline focus:border-primary outline-none"
               placeholder="老人账号生成的邀请码"
             />
           </div>
           {error && (
-            <div className="bg-red-50 border-2 border-red-300 text-red-700 rounded-xl px-4 py-2">
+            <div className="bg-danger-soft border border-hairline text-danger rounded-btn px-4 py-2">
               {error}
             </div>
           )}
           {message && (
-            <div className="bg-green-50 border-2 border-green-300 text-green-700 rounded-xl px-4 py-2">
+            <div className="bg-success-soft border border-hairline text-success rounded-btn px-4 py-2">
               {message}
             </div>
           )}
@@ -767,24 +795,26 @@ export default function FamilyPage() {
       </section>
 
       {/* 老人列表 */}
-      <section className="bg-white rounded-2xl shadow-sm border-2 border-warm-light p-6">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">
-          👴 已绑定的老人（{elderlyList.length}）
+      <section className="bg-card rounded-card shadow-card border border-hairline p-5">
+        <h2 className="flex items-center gap-2 text-lg font-bold text-ink mb-4">
+          <Users aria-hidden className="h-5 w-5 text-primary" />
+          已绑定的老人
+          <span className="text-sm font-medium text-faint">（{elderlyList.length}）</span>
         </h2>
         {elderlyList.length === 0 ? (
-          <p className="text-gray-500">还没有绑定老人，请先绑定</p>
+          <p className="text-muted">还没有绑定老人，请先绑定</p>
         ) : (
           <ul className="space-y-3">
             {elderlyList.map((e) => (
               <li
                 key={e.elderly_id}
-                className="flex items-center justify-between bg-warm-light/40 rounded-xl p-4 gap-3 flex-wrap"
+                className="flex items-center justify-between bg-primary-softer rounded-btn p-4 gap-3 flex-wrap"
               >
                 <div>
-                  <p className="font-bold text-lg text-gray-900">
+                  <p className="font-bold text-lg text-ink">
                     {e.name || e.username}
                   </p>
-                  <p className="text-sm text-gray-500">@{e.username}</p>
+                  <p className="text-sm text-muted">@{e.username}</p>
                 </div>
                 <div className="flex gap-2 flex-wrap">
                   <LargeButton
@@ -817,12 +847,16 @@ export default function FamilyPage() {
           </ul>
         )}
       </section>
+      </div>
 
       {/* 给家人留句话（家属 → 老人 双向互动） */}
       {elderlyList.length > 0 && (
-        <section className="bg-white rounded-2xl shadow-sm border-2 border-warm-light p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-1">💌 给家人留句话</h2>
-          <p className="text-sm text-gray-500 mb-4">
+        <section className="bg-card rounded-card shadow-card border border-hairline p-5">
+          <h2 className="flex items-center gap-2 text-lg font-bold text-ink mb-1">
+            <Mail aria-hidden className="h-5 w-5 text-primary" />
+            给家人留句话
+          </h2>
+          <p className="text-sm text-muted mb-4">
             写下问候或叮嘱，老人打开 App 就能看到，还能回您一个 ❤️
           </p>
           <form onSubmit={handleSendMsg} className="space-y-3">
@@ -833,7 +867,7 @@ export default function FamilyPage() {
                   setMsgTarget(e.target.value);
                   loadSent(e.target.value);
                 }}
-                className="w-full min-h-[48px] px-3 rounded-xl border-2 border-warm-light focus:border-warm-primary outline-none bg-white"
+                className="w-full min-h-[48px] px-3 rounded-btn border border-hairline focus:border-primary outline-none bg-card"
                 aria-label="选择老人"
               >
                 {elderlyList.map((e) => (
@@ -849,10 +883,10 @@ export default function FamilyPage() {
                   key={c.value}
                   type="button"
                   onClick={() => setMsgCategory(c.value)}
-                  className={`min-h-[40px] px-3 rounded-xl text-sm border-2 ${
+                  className={`min-h-[40px] px-3 rounded-btn text-sm border ${
                     msgCategory === c.value
-                      ? 'bg-warm-primary text-white border-warm-primary'
-                      : 'bg-white text-gray-700 border-warm-light'
+                      ? 'bg-primary text-white border-primary'
+                      : 'bg-card text-ink border-hairline'
                   }`}
                 >
                   {c.emoji} {c.label}
@@ -864,7 +898,7 @@ export default function FamilyPage() {
               onChange={(e) => setMsgContent(e.target.value)}
               rows={2}
               placeholder="如：妈，天冷了记得加衣裳，我周末去看您～"
-              className="w-full px-4 py-3 rounded-2xl border-2 border-warm-light focus:border-warm-primary outline-none resize-none"
+              className="w-full px-4 py-3 rounded-card border border-hairline focus:border-primary outline-none resize-none"
             />
             <LargeButton type="submit" disabled={sendingMsg || !msgContent.trim()}>
               {sendingMsg ? '发送中...' : '发送给TA'}
@@ -873,38 +907,38 @@ export default function FamilyPage() {
 
       {/* 家人和系统消息（折叠收纳：标题栏常驻「今日日报」入口与未读角标） */}
       {selectedId !== null && (
-        <div className="mt-4 border-2 border-warm-light rounded-2xl overflow-hidden">
-          <div className="flex items-center gap-2 bg-warm-light/40 px-4 py-2">
+        <div className="mt-4 border border-hairline rounded-card overflow-hidden">
+          <div className="flex items-center gap-2 bg-primary-softer px-4 py-2">
             <button
               type="button"
               onClick={() => setInboxOpen((v) => !v)}
               aria-expanded={inboxOpen}
               className="flex items-center gap-2 flex-1 text-left min-h-[44px]"
             >
-              <span className="font-medium text-gray-700">💬 家人和系统消息</span>
+              <span className="font-medium text-ink">💬 家人和系统消息</span>
               {inboxUnread > 0 && (
-                <span className="text-xs bg-rose-500 text-white rounded-full px-2 py-0.5">
+                <span className="text-xs bg-danger text-white rounded-full px-2 py-0.5">
                   {inboxUnread} 条未读
                 </span>
               )}
-              <span className="ml-auto text-gray-500">{inboxOpen ? '▾' : '▸'}</span>
+              <span className="ml-auto text-muted">{inboxOpen ? '▾' : '▸'}</span>
             </button>
             <button
               type="button"
               onClick={handleRefreshDigest}
               disabled={digestLoading || !selectedId}
               title="立即生成/获取今日陪伴日报，不必等每天 20:30 的定时推送"
-              className="text-sm text-warm-primary border border-warm-primary rounded-lg px-3 py-1 min-h-[36px] disabled:opacity-50"
+              className="text-sm text-primary border border-primary rounded-lg px-3 py-1 min-h-[36px] disabled:opacity-50"
             >
               {digestLoading ? '生成中…' : '📅 今日日报'}
             </button>
           </div>
           {digestHint && (
-            <p className="text-sm text-warm-primary px-4 pt-2">{digestHint}</p>
+            <p className="text-sm text-primary px-4 pt-2">{digestHint}</p>
           )}
           {inboxOpen && (
             inboxMsgs.length === 0 ? (
-              <p className="text-sm text-gray-500 px-4 py-3">
+              <p className="text-sm text-muted px-4 py-3">
                 今天还没有消息。点「今日日报」，马上为{selectedElderlyName}生成一份。
               </p>
             ) : (
@@ -915,14 +949,14 @@ export default function FamilyPage() {
                   ) : (
                     <li
                       key={m.id}
-                      className={`rounded-xl px-4 py-3 border-2 ${
+                      className={`rounded-btn px-4 py-3 border ${
                         m.is_read
-                          ? 'bg-warm-light/40 border-warm-light'
-                          : 'bg-rose-50 border-rose-300'
+                          ? 'bg-primary-softer border-hairline'
+                          : 'bg-accent-soft border-hairline'
                       }`}
                     >
-                      <p className="text-gray-900">{m.content}</p>
-                      <p className="text-sm text-gray-500 mt-1">
+                      <p className="text-ink">{m.content}</p>
+                      <p className="text-sm text-muted mt-1">
                         {new Date(m.created_at).toLocaleString('zh-CN')}
                         {m.is_read && m.reaction ? ` · 您已回应 ${m.reaction}` : ''}
                       </p>
@@ -933,7 +967,7 @@ export default function FamilyPage() {
                               key={r}
                               type="button"
                               onClick={() => handleMsgRead(m.id, r)}
-                              className="min-h-[40px] min-w-[48px] rounded-xl bg-warm-light hover:bg-warm-primary text-lg"
+                              className="min-h-[40px] min-w-[48px] rounded-btn bg-primary-soft hover:bg-primary text-lg"
                               aria-label={`回应 ${r}`}
                             >
                               {r}
@@ -952,23 +986,23 @@ export default function FamilyPage() {
 
           {/* 我发出的留言（折叠收纳） */}
           {sentMsgs.length > 0 && (
-            <div className="mt-3 border-2 border-warm-light rounded-2xl overflow-hidden">
+            <div className="mt-3 border border-hairline rounded-card overflow-hidden">
               <button
                 type="button"
                 onClick={() => setSentOpen((v) => !v)}
                 aria-expanded={sentOpen}
-                className="w-full flex items-center gap-2 bg-warm-light/40 px-4 py-2 text-left min-h-[44px]"
+                className="w-full flex items-center gap-2 bg-primary-softer px-4 py-2 text-left min-h-[44px]"
               >
-                <span className="font-medium text-gray-700">📮 我发出的留言</span>
-                <span className="text-sm text-gray-500">{sentMsgs.length} 条</span>
-                <span className="ml-auto text-gray-500">{sentOpen ? '▾' : '▸'}</span>
+                <span className="font-medium text-ink">📮 我发出的留言</span>
+                <span className="text-sm text-muted">{sentMsgs.length} 条</span>
+                <span className="ml-auto text-muted">{sentOpen ? '▾' : '▸'}</span>
               </button>
               {sentOpen && (
                 <ul className="space-y-2 p-4 pt-2">
                   {sentMsgs.map((m) => (
-                    <li key={m.id} className="bg-warm-light/40 rounded-xl px-4 py-3">
-                      <p className="text-gray-900">{m.content}</p>
-                      <p className="text-sm text-gray-500 mt-1">
+                    <li key={m.id} className="bg-primary-softer rounded-btn px-4 py-3">
+                      <p className="text-ink">{m.content}</p>
+                      <p className="text-sm text-muted mt-1">
                         {new Date(m.created_at).toLocaleString('zh-CN')} ·{' '}
                         {m.is_read
                           ? `✅ 老人已看到${m.reaction ? ` · 回应 ${m.reaction}` : ''}`
@@ -985,9 +1019,9 @@ export default function FamilyPage() {
 
       {/* 让小狗传话（家属端：仅传话，不指挥动作） */}
       {elderlyList.length > 0 && (
-        <section className="bg-white rounded-2xl shadow-sm border-2 border-warm-light p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-1">🐶 让小狗传话</h2>
-          <p className="text-sm text-gray-500 mb-4">
+        <section className="bg-card rounded-card shadow-card border border-hairline p-6">
+          <h2 className="flex items-center gap-2 text-lg font-bold text-ink mb-1"><Dog aria-hidden className="h-5 w-5 text-primary" />让小狗传话</h2>
+          <p className="text-sm text-muted mb-4">
             写一句话，小狗会在老人身边念出来。例如选「女儿」、写「记得按时吃药」，
             小狗就会说「女儿提醒您：记得按时吃药」。仅传话，不会指挥小狗做动作。
           </p>
@@ -999,7 +1033,7 @@ export default function FamilyPage() {
                   setMsgTarget(e.target.value);
                   loadSent(e.target.value);
                 }}
-                className="w-full min-h-[48px] px-3 rounded-xl border-2 border-warm-light focus:border-warm-primary outline-none bg-white"
+                className="w-full min-h-[48px] px-3 rounded-btn border border-hairline focus:border-primary outline-none bg-card"
                 aria-label="选择老人"
               >
                 {elderlyList.map((e) => (
@@ -1015,10 +1049,10 @@ export default function FamilyPage() {
                   key={r}
                   type="button"
                   onClick={() => setRelayRelation(r)}
-                  className={`min-h-[40px] px-3 rounded-xl text-sm border-2 ${
+                  className={`min-h-[40px] px-3 rounded-btn text-sm border ${
                     relayRelation === r
-                      ? 'bg-warm-primary text-white border-warm-primary'
-                      : 'bg-white text-gray-700 border-warm-light'
+                      ? 'bg-primary text-white border-primary'
+                      : 'bg-card text-ink border-hairline'
                   }`}
                 >
                   {r}
@@ -1027,10 +1061,10 @@ export default function FamilyPage() {
               <button
                 type="button"
                 onClick={() => setRelayRelation('__custom__')}
-                className={`min-h-[40px] px-3 rounded-xl text-sm border-2 ${
+                className={`min-h-[40px] px-3 rounded-btn text-sm border ${
                   relayRelation === '__custom__'
-                    ? 'bg-warm-primary text-white border-warm-primary'
-                    : 'bg-white text-gray-700 border-warm-light'
+                    ? 'bg-primary text-white border-primary'
+                    : 'bg-card text-ink border-hairline'
                 }`}
               >
                 其他
@@ -1041,7 +1075,7 @@ export default function FamilyPage() {
                 value={relayCustom}
                 onChange={(e) => setRelayCustom(e.target.value)}
                 placeholder="如：小妹 / 护工阿姨"
-                className="w-full min-h-[48px] px-3 rounded-xl border-2 border-warm-light focus:border-warm-primary outline-none"
+                className="w-full min-h-[48px] px-3 rounded-btn border border-hairline focus:border-primary outline-none"
               />
             )}
             <textarea
@@ -1049,13 +1083,13 @@ export default function FamilyPage() {
               onChange={(e) => setRelayContent(e.target.value)}
               rows={2}
               placeholder="要传的话，如：记得按时吃药 / 今天降温多穿点"
-              className="w-full px-4 py-3 rounded-2xl border-2 border-warm-light focus:border-warm-primary outline-none resize-none"
+              className="w-full px-4 py-3 rounded-card border border-hairline focus:border-primary outline-none resize-none"
             />
             <LargeButton type="submit" disabled={sendingRelay || !relayContent.trim()}>
               {sendingRelay ? '小狗跑腿中...' : '🐶 让小狗去说'}
             </LargeButton>
             {relayMsg && (
-              <div className="bg-green-50 border-2 border-green-300 text-green-700 rounded-xl px-4 py-2">
+              <div className="bg-success-soft border border-hairline text-success rounded-btn px-4 py-2">
                 {relayMsg}
               </div>
             )}
@@ -1068,17 +1102,17 @@ export default function FamilyPage() {
       {alerts.length > 0 && (
         <section className="space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <h2 className="text-xl font-bold text-gray-900">
-              ⚠️ 情绪告警（{pendingAlerts.length} 条待关注）
+            <h2 className="text-xl font-bold text-ink">
+              <Mail aria-hidden className="h-5 w-5 text-danger inline-block mr-1.5" />情绪告警（{pendingAlerts.length} 条待关注）
             </h2>
             {elderlyList.length > 1 && (
               <div className="flex gap-2 flex-wrap">
                 <button
                   onClick={() => setAlertElderly('all')}
-                  className={`px-3 py-1 rounded-lg text-sm border-2 ${
+                  className={`px-3 py-1 rounded-lg text-sm border ${
                     alertElderly === 'all'
-                      ? 'bg-warm-primary text-white border-warm-primary'
-                      : 'bg-white text-gray-700 border-warm-light'
+                      ? 'bg-primary text-white border-primary'
+                      : 'bg-card text-ink border-hairline'
                   }`}
                 >
                   全部
@@ -1087,10 +1121,10 @@ export default function FamilyPage() {
                   <button
                     key={e.elderly_id}
                     onClick={() => setAlertElderly(e.elderly_id)}
-                    className={`px-3 py-1 rounded-lg text-sm border-2 ${
+                    className={`px-3 py-1 rounded-lg text-sm border ${
                       alertElderly === e.elderly_id
-                        ? 'bg-warm-primary text-white border-warm-primary'
-                        : 'bg-white text-gray-700 border-warm-light'
+                        ? 'bg-primary text-white border-primary'
+                        : 'bg-card text-ink border-hairline'
                     }`}
                   >
                     {e.name || e.username}
@@ -1101,14 +1135,14 @@ export default function FamilyPage() {
           </div>
 
           {pendingAlerts.length === 0 ? (
-            <p className="text-gray-500">没有待关注的告警 🎉</p>
+            <p className="text-muted">没有待关注的告警 🎉</p>
           ) : (
             <div className="space-y-3">{pendingAlerts.map((a) => renderAlert(a))}</div>
           )}
 
           {ackedAlerts.length > 0 && (
-            <details className="bg-white rounded-2xl border-2 border-warm-light p-4">
-              <summary className="cursor-pointer select-none font-medium text-gray-700">
+            <details className="bg-card rounded-card border border-hairline p-4">
+              <summary className="cursor-pointer select-none font-medium text-ink">
                 ✅ 已处理的告警（{ackedAlerts.length}）
               </summary>
               <div className="space-y-3 mt-3">
@@ -1123,8 +1157,8 @@ export default function FamilyPage() {
       {selectedId !== null && tab === 'emotion' && (
         <section className="space-y-4">
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <h2 className="text-xl font-bold text-gray-900">
-              📈 {selectedElderlyName} 的情绪历史
+            <h2 className="text-xl font-bold text-ink">
+              <Activity aria-hidden className="h-5 w-5 text-primary inline-block mr-1.5" />{selectedElderlyName} 的情绪历史
             </h2>
             <div className="flex items-center gap-2">
               {([7, 30] as const).map((d) => (
@@ -1145,9 +1179,9 @@ export default function FamilyPage() {
           <EmotionInsights records={records} />
           <EmotionChart records={records} />
           <ChatRhythmHeatmap rhythm={rhythm} />
-          <div className="bg-white rounded-2xl shadow-sm border-2 border-warm-light p-6">
+          <div className="bg-card rounded-card shadow-card border border-hairline p-6">
             {records.length === 0 ? (
-              <p className="text-gray-500">暂无情绪记录</p>
+              <p className="text-muted">暂无情绪记录</p>
             ) : (
               <ul className="space-y-2">
                 {[...records]
@@ -1158,12 +1192,12 @@ export default function FamilyPage() {
                   .map((r, i) => (
                     <li
                       key={i}
-                      className="flex items-center justify-between bg-warm-light/40 rounded-xl px-4 py-3"
+                      className="flex items-center justify-between bg-primary-softer rounded-btn px-4 py-3"
                     >
-                      <span className="font-medium text-gray-900">
+                      <span className="font-medium text-ink">
                         {EMOTION_LABEL[r.emotion] || r.emotion} · 强度 {Math.round(r.intensity * 100)}%
                       </span>
-                      <span className="text-sm text-gray-500">
+                      <span className="text-sm text-muted">
                         {new Date(r.created_at).toLocaleString('zh-CN')}
                       </span>
                     </li>
@@ -1177,8 +1211,8 @@ export default function FamilyPage() {
       {/* 选中老人的记忆 */}
       {selectedId !== null && tab === 'memories' && (
         <section className="space-y-4">
-          <h2 className="text-xl font-bold text-gray-900">
-            🧠 {selectedElderlyName} 的记忆
+          <h2 className="text-xl font-bold text-ink">
+            <BookHeart aria-hidden className="h-5 w-5 text-primary inline-block mr-1.5" />{selectedElderlyName} 的记忆
           </h2>
           <MemoryThemeGraph graph={memoryGraph} />
           <PersonNetwork
@@ -1190,11 +1224,11 @@ export default function FamilyPage() {
             }
           />
           {selectedPerson && (
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-muted">
               正在查看「{selectedPerson}」相关的记忆，点上方人物可取消筛选
             </p>
           )}
-          <div className="bg-white rounded-2xl shadow-sm border-2 border-warm-light p-6">
+          <div className="bg-card rounded-card shadow-card border border-hairline p-6">
             <MemoryList memories={visibleMemories} />
           </div>
         </section>
@@ -1221,7 +1255,9 @@ export default function FamilyPage() {
       {memoirToast && (
         <div
           role="status"
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-warm-dark text-white px-5 py-3 rounded-xl shadow-lg text-base"
+          className="fixed left-1/2 -translate-x-1/2 z-50 bg-primary-strong text-white px-5 py-3 rounded-btn shadow-card text-base"
+          // 手机底部有固定 TabBar，提示条要抬到它上面才看得见
+          style={{ bottom: 'calc(1.5rem + var(--app-tabbar-h))' }}
         >
           {memoirToast}
         </div>

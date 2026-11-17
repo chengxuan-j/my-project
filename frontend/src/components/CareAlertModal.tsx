@@ -216,15 +216,15 @@ export function CareAlertModal() {
       aria-label={title}
       className="fixed inset-0 z-[70] bg-black/55 backdrop-blur-sm flex items-center justify-center p-4"
     >
-      <div className="w-full max-w-lg bg-white rounded-3xl border-4 border-rose-400 shadow-2xl overflow-hidden">
+      <div className="w-full max-w-lg bg-card rounded-card border-4 border-danger shadow-float overflow-hidden">
         {/* 顶部警示条 */}
-        <div className="bg-rose-500 text-white px-6 py-4 flex items-center gap-3">
+        <div className="bg-danger text-white px-6 py-4 flex items-center gap-3">
           <span className="text-3xl animate-bounce" aria-hidden>
             🔔
           </span>
           <div>
             <p className="text-2xl font-bold leading-tight">{title}</p>
-            <p className="text-rose-50 text-sm mt-0.5">
+            <p className="text-on-primary text-sm mt-0.5">
               {preview ? '这是试看效果，不会真的记录' : '这事别忘了，处理完再点下面的按钮'}
             </p>
           </div>
@@ -234,14 +234,14 @@ export function CareAlertModal() {
           {shownItems.map((item) => (
             <div
               key={item.key}
-              className="rounded-2xl border-2 border-amber-300 bg-amber-50 px-4 py-4"
+              className="rounded-card border border-hairline bg-warning-soft px-4 py-4"
             >
-              <p className="text-2xl font-bold text-gray-900">
+              <p className="text-2xl font-bold text-ink">
                 {item.kind === 'medication' ? '💊 ' : '🏥 '}
                 {item.title}
               </p>
-              {item.detail && <p className="text-lg text-gray-700 mt-1">{item.detail}</p>}
-              <p className="text-base text-rose-700 font-medium mt-2">
+              {item.detail && <p className="text-lg text-ink mt-1">{item.detail}</p>}
+              <p className="text-base text-danger font-medium mt-2">
                 原定 {fmtClock(item.scheduled_for)}
                 {(item.overdue_minutes ?? 0) > 0
                   ? ` · 已经过了 ${item.overdue_minutes} 分钟`
@@ -261,7 +261,7 @@ export function CareAlertModal() {
               </LargeButton>
             </div>
           ))}
-          {error && <p className="text-rose-600 text-center">{error}</p>}
+          {error && <p className="text-danger text-center">{error}</p>}
         </div>
 
         <div className="px-5 pb-5">
@@ -273,7 +273,7 @@ export function CareAlertModal() {
           >
             {preview ? '关闭预览' : '⏰ 过 10 分钟再提醒我'}
           </LargeButton>
-          <p className="text-center text-sm text-gray-500 mt-2">
+          <p className="text-center text-sm text-muted mt-2">
             {preview
               ? '这是试看效果，点按钮不会真的记录'
               : '点上面的按钮确认后，这条提醒就消掉了'}

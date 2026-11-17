@@ -40,26 +40,26 @@ export function GrowthChart({
   );
 
   return (
-    <div className="bg-white rounded-2xl p-5 shadow-sm border border-warm-light">
+    <div className="bg-card rounded-card p-5 shadow-card border border-hairline">
       <div className="flex flex-wrap items-end gap-x-6 gap-y-2 mb-4">
         <div>
-          <p className="text-sm text-gray-500">AI 已经记得关于你的</p>
-          <p className="text-3xl font-bold text-warm-primary">{total}<span className="text-base ml-1">件事</span></p>
+          <p className="text-sm text-muted">AI 已经记得关于你的</p>
+          <p className="text-3xl font-bold text-primary">{total}<span className="text-base ml-1">件事</span></p>
         </div>
         <div>
-          <p className="text-sm text-gray-500">互相陪伴</p>
-          <p className="text-3xl font-bold text-warm-primary">{daysTogether}<span className="text-base ml-1">天</span></p>
+          <p className="text-sm text-muted">互相陪伴</p>
+          <p className="text-3xl font-bold text-primary">{daysTogether}<span className="text-base ml-1">天</span></p>
         </div>
         <div>
-          <p className="text-sm text-gray-500">这个月新记住</p>
-          <p className="text-3xl font-bold text-warm-primary">{thisMonth}<span className="text-base ml-1">条</span></p>
+          <p className="text-sm text-muted">这个月新记住</p>
+          <p className="text-3xl font-bold text-primary">{thisMonth}<span className="text-base ml-1">条</span></p>
         </div>
       </div>
 
       <div className="flex items-end gap-2 h-32">
         {months.map((m) => (
           <div key={m.month} className="flex-1 flex flex-col items-center gap-1">
-            <span className="text-xs text-gray-500">{m.count > 0 ? m.count : ''}</span>
+            <span className="text-xs text-muted">{m.count > 0 ? m.count : ''}</span>
             <div className="w-full flex flex-col-reverse rounded-t-lg overflow-hidden" style={{ height: `${(m.count / max) * 100}%`, minHeight: m.count > 0 ? 4 : 2, backgroundColor: m.count === 0 ? '#F1EFE8' : undefined }}>
               {Object.entries(m.by_type || {}).map(([type, n]) => (
                 <div
@@ -69,7 +69,7 @@ export function GrowthChart({
                 />
               ))}
             </div>
-            <span className="text-[10px] text-gray-400">{m.month.slice(5)}月</span>
+            <span className="text-[10px] text-faint">{m.month.slice(5)}月</span>
           </div>
         ))}
       </div>
@@ -77,7 +77,7 @@ export function GrowthChart({
       {legend.length > 0 && (
         <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3">
           {legend.map((t) => (
-            <span key={t} className="flex items-center gap-1 text-xs text-gray-500">
+            <span key={t} className="flex items-center gap-1 text-xs text-muted">
               <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: TYPE_COLORS[t] || '#D6D3CD' }} />
               {TYPE_LABELS[t] || t}
             </span>

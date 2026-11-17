@@ -1,13 +1,17 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { Brain, Cake, KeyRound, Pill, RefreshCw, Save, Target, UserRound } from 'lucide-react';
 import { profileApi, memoryApi, ApiError, Profile, MemoryItem } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth';
 import { LargeButton } from '@/components/LargeButton';
 import { MoodCalendar } from '@/components/MoodCalendar';
 import { MemoryList } from '@/components/MemoryList';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { SectionCard } from '@/components/ui/SectionCard';
+import { Badge } from '@/components/ui/Badge';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -67,7 +71,7 @@ export default function ProfilePage() {
       if (typeof updated.name === 'string' && updated.name.trim()) {
         useAuthStore.getState().updateUserName(updated.name.trim());
       }
-      setMessage('✅ 保存成功！');
+      setMessage('保存成功');
       setTimeout(() => setMessage(''), 3000);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '保存失败');
@@ -115,224 +119,227 @@ export default function ProfilePage() {
 
   const genderLabel =
     profile.gender === 'male'
-      ? '♂ 男'
+      ? '男'
       : profile.gender === 'female'
-        ? '♀ 女'
+        ? '女'
         : profile.gender === 'other'
-          ? '⚧ 其他'
+          ? '其他'
           : '';
+
+  const displayName = (profile.name as string) || user?.name || user?.username || '您';
 
   if (loading) {
     return (
-      <div className="max-w-3xl mx-auto px-4 py-8 text-center text-gray-600">
+      <div className="max-w-3xl mx-auto px-4 py-8 text-center text-muted">
         加载中...
       </div>
     );
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
-      <h1 className="text-2xl font-bold text-warm-primary">👤 我的</h1>
+    <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+      <PageHeader
+        eyebrow="AI 眼中的你"
+        title="我的画像"
+        description="您填写的资料和聊天里自然聊到的事，都会让陪伴更懂您。"
+        icon={<UserRound aria-hidden className="h-7 w-7 text-primary" />}
+      />
 
-      {/* 微信式收纳：低频功能入口集中到「我的」页（2026-11-05） */}
-      <section className="grid grid-cols-4 gap-2">
-        <QuickLink href="/letters" icon="💌" label="信笺" />
-        <QuickLink href="/journey" icon="🌊" label="人生河" />
-        <QuickLink href="/book" icon="📗" label="人生之书" />
-        <QuickLink href="/account" icon="⚙" label="账号" />
-      </section>
-
-      {/* 我的档案（只读速览，chips 展示） */}
-      <section className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl shadow-sm border-2 border-amber-200 p-6">
-        <h2 className="text-lg font-bold text-gray-900 mb-3">📇 我的档案</h2>
-
-        <div className="flex flex-wrap gap-2 mb-4">
-          {(profile.name as string) && (
-            <span className="px-3 py-1 rounded-lg bg-white text-gray-800 font-medium">
-              👤 {profile.name as string}
-            </span>
-          )}
-          {(profile.age as number) != null && (
-            <span className="px-3 py-1 rounded-lg bg-white text-gray-800 font-medium">
-              🎂 {profile.age as number} 岁
-            </span>
-          )}
-          {genderLabel && (
-            <span className="px-3 py-1 rounded-lg bg-white text-gray-800 font-medium">
-              {genderLabel}
-            </span>
-          )}
-        </div>
-
-        <p className="text-sm font-medium text-gray-600 mb-1">兴趣爱好</p>
-        <div className="flex flex-wrap gap-2 mb-4">
-          {interestChips.length === 0 ? (
-            <span className="text-gray-500 text-sm">还没填写，下面补上吧</span>
-          ) : (
-            interestChips.map((it) => (
+      <div className="grid lg:grid-cols-[360px_1fr] gap-5 items-start">
+        {/* 左栏：档案速览 + 邀请码 + 心情日历 */}
+        <div className="space-y-5">
+          <SectionCard title="我的档案" icon={<UserRound aria-hidden className="h-5 w-5" />}>
+            <div className="flex items-center gap-3 mb-4">
               <span
-                key={it}
-                className="px-3 py-1 rounded-full bg-warm-primary text-white text-sm"
+                aria-hidden
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-pill bg-primary text-on-primary text-xl font-bold"
               >
-                🎯 {it}
+                {displayName.slice(0, 1)}
               </span>
-            ))
-          )}
+              <div className="min-w-0">
+                <p className="text-lg font-bold text-ink truncate">{displayName}</p>
+                <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                  {(profile.age as number) != null && (
+                    <Badge tone="primary">
+                      <Cake aria-hidden className="h-3 w-3" />
+                      {profile.age as number} 岁
+                    </Badge>
+                  )}
+                  {genderLabel && <Badge tone="neutral">{genderLabel}</Badge>}
+                </div>
+              </div>
+            </div>
+
+            <p className="text-sm font-medium text-muted mb-1.5">兴趣爱好</p>
+            <div className="flex flex-wrap gap-1.5 mb-4">
+              {interestChips.length === 0 ? (
+                <span className="text-muted text-sm">还没填写，右边补上吧</span>
+              ) : (
+                interestChips.map((it) => (
+                  <Badge key={it} tone="primary">
+                    <Target aria-hidden className="h-3 w-3" />
+                    {it}
+                  </Badge>
+                ))
+              )}
+            </div>
+
+            <p className="text-sm font-medium text-muted mb-1.5">健康情况</p>
+            <div className="flex flex-wrap gap-1.5">
+              {healthChips.length === 0 ? (
+                <span className="text-muted text-sm">还没填写</span>
+              ) : (
+                healthChips.map((h) => (
+                  <Badge key={h} tone="warning">
+                    <Pill aria-hidden className="h-3 w-3" />
+                    {h}
+                  </Badge>
+                ))
+              )}
+            </div>
+          </SectionCard>
+
+          <InviteCodeCard />
+          <MoodCalendar />
         </div>
 
-        <p className="text-sm font-medium text-gray-600 mb-1">健康情况</p>
-        <div className="flex flex-wrap gap-2">
-          {healthChips.length === 0 ? (
-            <span className="text-gray-500 text-sm">还没填写</span>
-          ) : (
-            healthChips.map((h) => (
-              <span
-                key={h}
-                className="px-3 py-1 rounded-full bg-white border border-warm-primary text-warm-primary text-sm"
-              >
-                💊 {h}
-              </span>
-            ))
-          )}
-        </div>
-      </section>
-
-      <form
-        onSubmit={handleSave}
-        className="bg-white rounded-2xl shadow-sm border-2 border-warm-light p-6 space-y-4"
-      >
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="p-name" className="block mb-1 font-medium text-gray-700">
-              姓名/称呼
-            </label>
-            <input
-              id="p-name"
-              type="text"
-              value={(profile.name as string) || ''}
-              onChange={(e) => updateField('name', e.target.value)}
-              className="w-full min-h-[48px] px-3 rounded-xl border-2 border-warm-light focus:border-warm-primary outline-none"
-            />
-          </div>
-          <div>
-            <label htmlFor="p-age" className="block mb-1 font-medium text-gray-700">
-              年龄
-            </label>
-            <input
-              id="p-age"
-              type="number"
-              min={0}
-              max={150}
-              value={(profile.age as number) ?? ''}
-              onChange={(e) =>
-                updateField('age', e.target.value ? Number(e.target.value) : undefined)
-              }
-              className="w-full min-h-[48px] px-3 rounded-xl border-2 border-warm-light focus:border-warm-primary outline-none"
-            />
-          </div>
-          <div>
-            <label htmlFor="p-gender" className="block mb-1 font-medium text-gray-700">
-              性别
-            </label>
-            <select
-              id="p-gender"
-              value={(profile.gender as string) || ''}
-              onChange={(e) => updateField('gender', e.target.value)}
-              className="w-full min-h-[48px] px-3 rounded-xl border-2 border-warm-light focus:border-warm-primary outline-none bg-white"
-            >
-              <option value="">请选择</option>
-              <option value="male">男</option>
-              <option value="female">女</option>
-              <option value="other">其他</option>
-            </select>
-          </div>
-          <div>
-            <label htmlFor="p-interests" className="block mb-1 font-medium text-gray-700">
-              兴趣爱好（顿号分隔）
-            </label>
-            <input
-              id="p-interests"
-              type="text"
-              value={interestsStr}
-              onChange={(e) =>
-                updateField(
-                  'interests',
-                  e.target.value.split(/[、,，]/).filter(Boolean)
-                )
-              }
-              placeholder="如：下棋、唱戏、养花"
-              className="w-full min-h-[48px] px-3 rounded-xl border-2 border-warm-light focus:border-warm-primary outline-none"
-            />
-          </div>
-        </div>
-        <div>
-          <label htmlFor="p-health" className="block mb-1 font-medium text-gray-700">
-            健康情况
-          </label>
-          <textarea
-            id="p-health"
-            rows={3}
-            value={(profile.health as string) || ''}
-            onChange={(e) => updateField('health', e.target.value)}
-            placeholder="如：有高血压，腿脚不太方便..."
-            className="w-full px-3 py-2 rounded-xl border-2 border-warm-light focus:border-warm-primary outline-none resize-none"
-          />
-        </div>
-
-        {message && (
-          <div className="bg-green-50 border-2 border-green-300 text-green-700 rounded-xl px-4 py-2">
-            {message}
-          </div>
-        )}
-        {error && (
-          <div className="bg-red-50 border-2 border-red-300 text-red-700 rounded-xl px-4 py-2">
-            {error}
-          </div>
-        )}
-
-        <LargeButton type="submit" size="lg" disabled={saving} className="w-full md:w-auto">
-          {saving ? '保存中...' : '💾 保存画像'}
-        </LargeButton>
-      </form>
-
-      {/* 我的心情日历 */}
-      <MoodCalendar />
-
-      {/* 邀请码（仅老人） */}
-      <InviteCodeCard />
-
-      {/* 长期记忆 */}
-      <section className="bg-white rounded-2xl shadow-sm border-2 border-warm-light p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-gray-900">🧠 AI 记住的事（{memories.length}）</h2>
-          <button
-            type="button"
-            onClick={refreshMemories}
-            className="min-h-[40px] px-4 rounded-xl bg-warm-light hover:bg-warm-primary hover:text-white text-gray-700 transition-colors"
-            title="聊天后 AI 会在后台整理记忆，点这里刷新"
+        {/* 右栏：编辑资料 + AI 记忆 */}
+        <div className="space-y-5">
+          <SectionCard
+            title="编辑资料"
+            icon={<UserRound aria-hidden className="h-5 w-5" />}
+            meta="随时可以修改"
           >
-            🔄 刷新
-          </button>
-        </div>
-        <p className="text-sm text-gray-500 mb-4 bg-blue-50 border border-blue-200 rounded-xl px-3 py-2">
-          💡 上面是您主动填的"画像"，AI 每次聊天都会参考。这里是聊天中 AI <b>自动记下</b>的关键事，比如"女儿叫小芳"、"喜欢邓丽君"。聊天后等几秒点刷新能看到新记忆。
-        </p>
-        <MemoryList memories={memories} onDelete={handleDeleteMemory} />
-      </section>
-    </div>
-  );
-}
+            <form onSubmit={handleSave} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="p-name" className="block mb-1 font-medium text-ink">
+                    姓名/称呼
+                  </label>
+                  <input
+                    id="p-name"
+                    type="text"
+                    value={(profile.name as string) || ''}
+                    onChange={(e) => updateField('name', e.target.value)}
+                    className="w-full min-h-[48px] px-3 rounded-input border border-hairline focus:border-primary outline-none bg-card"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="p-age" className="block mb-1 font-medium text-ink">
+                    年龄
+                  </label>
+                  <input
+                    id="p-age"
+                    type="number"
+                    min={0}
+                    max={150}
+                    value={(profile.age as number) ?? ''}
+                    onChange={(e) =>
+                      updateField('age', e.target.value ? Number(e.target.value) : undefined)
+                    }
+                    className="w-full min-h-[48px] px-3 rounded-input border border-hairline focus:border-primary outline-none bg-card"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="p-gender" className="block mb-1 font-medium text-ink">
+                    性别
+                  </label>
+                  <select
+                    id="p-gender"
+                    value={(profile.gender as string) || ''}
+                    onChange={(e) => updateField('gender', e.target.value)}
+                    className="w-full min-h-[48px] px-3 rounded-input border border-hairline focus:border-primary outline-none bg-card"
+                  >
+                    <option value="">请选择</option>
+                    <option value="male">男</option>
+                    <option value="female">女</option>
+                    <option value="other">其他</option>
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="p-interests" className="block mb-1 font-medium text-ink">
+                    兴趣爱好（顿号分隔）
+                  </label>
+                  <input
+                    id="p-interests"
+                    type="text"
+                    value={interestsStr}
+                    onChange={(e) =>
+                      updateField(
+                        'interests',
+                        e.target.value.split(/[、,，]/).filter(Boolean)
+                      )
+                    }
+                    placeholder="如：下棋、唱戏、养花"
+                    className="w-full min-h-[48px] px-3 rounded-input border border-hairline focus:border-primary outline-none bg-card"
+                  />
+                </div>
+              </div>
+              <div>
+                <label htmlFor="p-health" className="block mb-1 font-medium text-ink">
+                  健康情况
+                </label>
+                <textarea
+                  id="p-health"
+                  rows={3}
+                  value={(profile.health as string) || ''}
+                  onChange={(e) => updateField('health', e.target.value)}
+                  placeholder="如：有高血压，腿脚不太方便..."
+                  className="w-full px-3 py-2 rounded-input border border-hairline focus:border-primary outline-none resize-none bg-card"
+                />
+              </div>
 
-/** 「我的」页收纳入口：信笺 / 人生河 / 人生之书 / 账号 */
-function QuickLink({ href, icon, label }: { href: string; icon: string; label: string }) {
-  return (
-    <Link
-      href={href}
-      className="flex flex-col items-center justify-center gap-1 rounded-2xl bg-white border-2 border-warm-light py-3 min-h-[64px] hover:border-warm-primary transition-colors"
-    >
-      <span className="text-2xl leading-none">{icon}</span>
-      <span className="text-xs text-gray-700">{label}</span>
-    </Link>
+              {message && (
+                <div className="bg-success-soft text-success rounded-btn px-4 py-2">
+                  {message}
+                </div>
+              )}
+              {error && (
+                <div className="bg-danger-soft text-danger rounded-btn px-4 py-2">
+                  {error}
+                </div>
+              )}
+
+              <LargeButton type="submit" size="lg" disabled={saving} className="w-full md:w-auto">
+                <Save aria-hidden className="h-5 w-5" />
+                {saving ? '保存中...' : '保存画像'}
+              </LargeButton>
+            </form>
+          </SectionCard>
+
+          <SectionCard
+            title="AI 记住的事"
+            icon={<Brain aria-hidden className="h-5 w-5" />}
+            meta={`${memories.length} 条`}
+            actions={
+              <button
+                type="button"
+                onClick={refreshMemories}
+                className="min-h-[40px] px-4 rounded-btn bg-primary-soft hover:bg-primary hover:text-on-primary text-primary font-medium flex items-center gap-1.5 transition-colors"
+                title="聊天后 AI 会在后台整理记忆，点这里刷新"
+              >
+                <RefreshCw aria-hidden className="h-4 w-4" />
+                刷新
+              </button>
+            }
+          >
+            <p className="text-sm text-muted mb-4 bg-lilac-soft rounded-btn px-3 py-2">
+              上面是您主动填的「画像」，AI 每次聊天都会参考。这里是聊天中 AI <b>自动记下</b>的关键事，
+              比如「女儿叫小芳」「喜欢邓丽君」。聊天后等几秒点刷新能看到新记忆。
+            </p>
+            {memories.length === 0 ? (
+              <EmptyState
+                icon={<Brain aria-hidden className="h-6 w-6" />}
+                title="还没有自动记下的事"
+                description="多聊几次，AI 会把重要的事记在这里。"
+              />
+            ) : (
+              <MemoryList memories={memories} onDelete={handleDeleteMemory} />
+            )}
+          </SectionCard>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -357,27 +364,24 @@ function InviteCodeCard() {
   if (user?.role !== 'elderly' || !code) return null;
 
   return (
-    <section className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl shadow-sm border-2 border-amber-200 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-bold text-gray-900 mb-1">🔑 我的邀请码</h2>
-          <p className="text-sm text-gray-600">把这个码告诉家人，他们就能绑定查看您的状态</p>
-        </div>
+    <SectionCard title="我的邀请码" icon={<KeyRound aria-hidden className="h-5 w-5" />}>
+      <p className="text-sm text-muted mb-3">
+        把这个码告诉家人，他们就能绑定查看您的状态。
+      </p>
+      <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={() => setShow(!show)}
-          className="min-h-[48px] px-6 rounded-xl bg-warm-primary text-white font-bold"
+          className="min-h-[44px] px-4 rounded-btn bg-primary text-on-primary font-bold text-sm"
         >
           {show ? '隐藏' : '显示'}
         </button>
-      </div>
-      {show && (
-        <div className="mt-4 bg-white rounded-xl px-6 py-4 text-center">
-          <p className="text-4xl font-mono font-bold text-warm-primary tracking-widest">
+        {show && (
+          <p className="flex-1 min-w-0 text-center bg-card rounded-btn px-4 py-2 text-2xl font-mono font-bold text-primary tracking-widest truncate">
             {code}
           </p>
-        </div>
-      )}
-    </section>
+        )}
+      </div>
+    </SectionCard>
   );
 }
