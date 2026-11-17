@@ -46,7 +46,7 @@ export function StoryPhoto({
   if (failed) {
     return (
       <div
-        className={`flex flex-col items-center justify-center bg-primary-soft text-muted text-sm rounded-btn min-h-[84px] ${className}`}
+        className={`flex flex-col items-center justify-center bg-warm-light text-gray-500 text-sm rounded-xl min-h-[84px] ${className}`}
       >
         <span aria-hidden>🖼️</span>
         <span>照片暂时看不到了</span>
@@ -56,7 +56,7 @@ export function StoryPhoto({
   if (!url) {
     return (
       <div
-        className={`bg-primary-soft animate-pulse rounded-btn min-h-[84px] ${className}`}
+        className={`bg-warm-light animate-pulse rounded-xl min-h-[84px] ${className}`}
         aria-label="照片加载中"
       />
     );
@@ -67,7 +67,7 @@ export function StoryPhoto({
       src={url}
       alt={media.caption || '回忆照片'}
       onClick={onClick}
-      className={`rounded-btn object-cover ${onClick ? 'cursor-pointer' : ''} ${className}`}
+      className={`rounded-xl object-cover ${onClick ? 'cursor-pointer' : ''} ${className}`}
     />
   );
 }
@@ -94,23 +94,23 @@ export function StoryPhotoStrip({
         <li key={m.id} className="relative">
           <StoryPhoto
             media={m}
-            className={`${size} border border-hairline`}
+            className={`${size} border border-amber-200`}
             onClick={onOpen ? () => onOpen(m) : undefined}
           />
           {m.caption && (
-            <p className="text-sm text-muted mt-1 max-w-[8rem] truncate" title={m.caption}>
+            <p className="text-sm text-gray-600 mt-1 max-w-[8rem] truncate" title={m.caption}>
               {m.caption}
             </p>
           )}
           {!m.caption && m.uploaded_by_role === 'family' && (
-            <p className="text-sm text-faint mt-1">家人补的</p>
+            <p className="text-sm text-gray-400 mt-1">家人补的</p>
           )}
           {onDelete && (
             <button
               type="button"
               onClick={() => onDelete(m)}
               aria-label={`删除照片${m.caption ? `：${m.caption}` : ''}`}
-              className="absolute -top-2 -right-2 min-h-[32px] min-w-[32px] rounded-full bg-card border border-hairline text-danger text-lg leading-none"
+              className="absolute -top-2 -right-2 min-h-[32px] min-w-[32px] rounded-full bg-white border-2 border-red-300 text-red-600 text-lg leading-none"
             >
               ×
             </button>
@@ -168,8 +168,8 @@ export function StoryPhotoUploader({
   };
 
   return (
-    <div className="mt-3 rounded-card border border-hairline bg-canvas p-4 space-y-3">
-      <p className="font-medium text-ink">
+    <div className="mt-3 rounded-2xl border-2 border-warm-light bg-warm-bg p-4 space-y-3">
+      <p className="font-medium text-gray-800">
         给{storyTitle ? `「${storyTitle}」` : '这段回忆'}补一张照片
       </p>
       <input
@@ -177,7 +177,7 @@ export function StoryPhotoUploader({
         type="file"
         accept="image/jpeg,image/png,image/webp,image/gif,image/bmp,image/tiff"
         onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-        className="block w-full text-base text-ink"
+        className="block w-full text-base text-gray-700"
         aria-label="选择照片"
       />
       <input
@@ -186,10 +186,10 @@ export function StoryPhotoUploader({
         onChange={(e) => setCaption(e.target.value)}
         maxLength={60}
         placeholder="写一句话说明（可留空）"
-        className="w-full min-h-[48px] px-3 rounded-btn border border-hairline focus:border-primary outline-none bg-card"
+        className="w-full min-h-[48px] px-3 rounded-xl border-2 border-warm-light focus:border-warm-primary outline-none bg-white"
       />
       {error && (
-        <p className="text-danger bg-danger-soft border border-hairline rounded-btn px-3 py-2">
+        <p className="text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
           {error}
         </p>
       )}
@@ -198,7 +198,7 @@ export function StoryPhotoUploader({
           type="button"
           onClick={submit}
           disabled={busy || !file}
-          className="min-h-[48px] px-5 rounded-btn bg-primary hover:bg-primary-strong disabled:opacity-50 text-white font-medium"
+          className="min-h-[48px] px-5 rounded-xl bg-warm-primary hover:bg-warm-dark disabled:opacity-50 text-white font-medium"
         >
           {busy ? '上传中…' : '上传照片'}
         </button>
@@ -210,13 +210,13 @@ export function StoryPhotoUploader({
               onCancel();
             }}
             disabled={busy}
-            className="min-h-[48px] px-5 rounded-btn bg-card border border-hairline text-ink"
+            className="min-h-[48px] px-5 rounded-xl bg-white border-2 border-warm-light text-gray-700"
           >
             取消
           </button>
         )}
       </div>
-      <p className="text-sm text-muted">
+      <p className="text-sm text-gray-500">
         最多 5MB，支持 jpg / png / webp 等常见格式。照片只是补在这段回忆旁边，
         不会改动老人讲过的内容。
       </p>

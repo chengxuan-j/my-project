@@ -2,12 +2,8 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AtSign, ShieldCheck, UserRound } from 'lucide-react';
 import { ApiError, authApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth';
-import { PageHeader } from '@/components/ui/PageHeader';
-import { SectionCard } from '@/components/ui/SectionCard';
-import { Badge } from '@/components/ui/Badge';
 
 export default function AccountPage() {
   const router = useRouter();
@@ -172,69 +168,63 @@ export default function AccountPage() {
   };
 
   if (!authReady || !accessToken || !user) {
-    return <div className="min-h-[50vh] flex items-center justify-center text-muted">正在加载账号…</div>;
+    return <div className="min-h-[50vh] flex items-center justify-center text-gray-500">正在加载账号…</div>;
   }
 
   const pendingUsernameChange = !!username && username.trim() !== user.username;
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6 space-y-5">
-      <PageHeader
-        eyebrow="账号安全"
-        title="邮箱与登录"
-        description="管理登录用户名、称呼和邮箱绑定，保护您的账号。"
-        icon={<ShieldCheck aria-hidden className="h-7 w-7 text-primary" />}
-      />
+    <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
+      <header>
+        <p className="text-sm font-semibold text-amber-600">账号安全</p>
+        <h1 className="text-3xl font-bold text-gray-900 mt-1">邮箱与登录</h1>
+      </header>
 
-      {error && <div className="rounded-btn bg-danger-soft px-4 py-3 text-danger">{error}</div>}
-      {notice && <div className="rounded-btn bg-success-soft px-4 py-3 text-success">{notice}</div>}
+      {error && <div className="rounded-xl border-2 border-red-200 bg-red-50 px-4 py-3 text-red-700">{error}</div>}
+      {notice && <div className="rounded-xl border-2 border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-700">{notice}</div>}
 
-      <div className="grid lg:grid-cols-2 gap-5 items-start">
-      <SectionCard
-        title="我的账号"
-        icon={<UserRound aria-hidden className="h-5 w-5" />}
-        meta={user.role === 'elderly' ? '老人账号' : '家属账号'}
-      >
-        <p className="text-sm text-muted">
+      <section className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+        <h2 className="text-xl font-bold text-gray-900">我的账号</h2>
+        <p className="text-sm text-gray-500 mt-1">
           登录用户名用来登录；{user.role === 'elderly' ? '称呼是 AI 和家里人叫你的名字，两者可以不一样。' : '称呼仅老人账号可设置。'}
         </p>
         <form onSubmit={saveAccount} className="mt-4 space-y-4">
           <label htmlFor="login-username" className="block">
-            <span className="block mb-2 font-medium text-ink">登录用户名</span>
+            <span className="block mb-2 font-medium text-gray-700">登录用户名</span>
             <input
               id="login-username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               maxLength={64}
-              className="w-full min-h-[56px] px-4 rounded-input border border-hairline focus:border-primary outline-none text-lg bg-card"
+              className="w-full min-h-[56px] px-4 rounded-xl border-2 border-warm-light focus:border-warm-primary outline-none text-lg"
               placeholder="用于登录的用户名"
               autoComplete="username"
             />
-            <span className="block mt-1 text-sm text-muted">
+            <span className="block mt-1 text-sm text-gray-500">
               3~64 个字符，可用中文、字母、数字、下划线、短横线
             </span>
           </label>
 
           {user.role === 'elderly' && (
             <label htmlFor="display-name" className="block">
-              <span className="block mb-2 font-medium text-ink">称呼</span>
+              <span className="block mb-2 font-medium text-gray-700">称呼</span>
               <input
                 id="display-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 maxLength={20}
-                className="w-full min-h-[56px] px-4 rounded-input border border-hairline focus:border-primary outline-none text-lg bg-card"
+                className="w-full min-h-[56px] px-4 rounded-xl border-2 border-warm-light focus:border-warm-primary outline-none text-lg"
                 placeholder="比如：李奶奶"
                 autoComplete="nickname"
               />
-              <span className="block mt-1 text-sm text-muted">最多 20 个字</span>
+              <span className="block mt-1 text-sm text-gray-500">最多 20 个字</span>
             </label>
           )}
 
           {pendingUsernameChange && (
             <>
               <label htmlFor="current-password" className="block">
-                <span className="block mb-2 font-medium text-ink">
+                <span className="block mb-2 font-medium text-gray-700">
                   当前密码（确认是本人操作）
                 </span>
                 <input
@@ -242,12 +232,12 @@ export default function AccountPage() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full min-h-[56px] px-4 rounded-input border border-hairline focus:border-primary outline-none text-lg bg-card"
+                  className="w-full min-h-[56px] px-4 rounded-xl border-2 border-warm-light focus:border-warm-primary outline-none text-lg"
                   placeholder="输入当前登录密码"
                   autoComplete="current-password"
                 />
               </label>
-              <p className="text-sm text-warning">
+              <p className="text-sm text-amber-700">
                 改完后旧用户名立即失效，下次请用新用户名登录；已绑定的家属关系不受影响。
               </p>
             </>
@@ -256,52 +246,35 @@ export default function AccountPage() {
           <button
             type="submit"
             disabled={savingAccount}
-            className="w-full min-h-[56px] rounded-btn bg-primary text-on-primary shadow-btn font-bold hover:bg-primary-strong disabled:opacity-50"
+            className="w-full min-h-[56px] rounded-xl bg-warm-primary text-white font-bold hover:bg-warm-dark disabled:opacity-50"
           >
             {savingAccount ? '保存中…' : '保存修改'}
           </button>
         </form>
-      </SectionCard>
+      </section>
 
-      <SectionCard
-        title="邮箱绑定"
-        icon={<AtSign aria-hidden className="h-5 w-5" />}
-        meta={currentEmail || '用于验证码登录'}
-        actions={
-          <Badge tone={currentEmail ? 'success' : 'warning'}>
-            {currentEmail ? '已绑定' : '未绑定'}
-          </Badge>
-        }
-      >
-        <div className="flex items-center justify-between gap-4 flex-wrap pb-4 border-b border-hairline">
-          <div>
-            <p className="text-sm text-muted">当前账号</p>
-            <p className="font-bold text-ink mt-1">{user.name || user.username}</p>
-          </div>
-          <p className="text-sm text-muted">{currentEmail || '还没有绑定邮箱'}</p>
+      <section className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+        <div className="flex items-center justify-between gap-4 flex-wrap pb-5 border-b border-slate-100">
+          <div><p className="text-sm text-gray-500">当前账号</p><p className="font-bold text-gray-900 mt-1">{user.name || user.username}</p></div>
+          <span className={`px-3 py-1 rounded-full text-sm font-semibold ${currentEmail ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{currentEmail ? '邮箱已绑定' : '尚未绑定邮箱'}</span>
         </div>
 
-        <form onSubmit={bindEmail} className="space-y-5 mt-4">
+        <form onSubmit={bindEmail} className="space-y-5 mt-5">
           <div>
-            <label htmlFor="account-email" className="block mb-2 font-medium text-ink">邮箱</label>
-            <input id="account-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full min-h-[56px] px-4 rounded-input border border-hairline focus:border-primary outline-none bg-card" placeholder="name@example.com" autoComplete="email" />
+            <label htmlFor="account-email" className="block mb-2 font-medium text-gray-700">邮箱</label>
+            <input id="account-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full min-h-[56px] px-4 rounded-xl border-2 border-warm-light focus:border-warm-primary outline-none" placeholder="name@example.com" autoComplete="email" />
           </div>
           <div>
-            <label htmlFor="account-email-code" className="block mb-2 font-medium text-ink">验证码</label>
+            <label htmlFor="account-email-code" className="block mb-2 font-medium text-gray-700">验证码</label>
             <div className="grid grid-cols-[1fr_auto] gap-2">
-              <input id="account-email-code" inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} className="min-w-0 min-h-[56px] px-4 rounded-input border border-hairline focus:border-primary outline-none tracking-widest bg-card" placeholder="6 位验证码" autoComplete="one-time-code" />
-              <button type="button" onClick={sendCode} disabled={sending || cooldown > 0} className="min-w-[120px] min-h-[56px] px-4 rounded-btn border border-primary text-primary font-semibold hover:bg-primary-soft disabled:opacity-50">{sending ? '发送中…' : cooldown > 0 ? `${cooldown} 秒` : '获取验证码'}</button>
+              <input id="account-email-code" inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} className="min-w-0 min-h-[56px] px-4 rounded-xl border-2 border-warm-light focus:border-warm-primary outline-none tracking-widest" placeholder="6 位验证码" autoComplete="one-time-code" />
+              <button type="button" onClick={sendCode} disabled={sending || cooldown > 0} className="min-w-[120px] min-h-[56px] px-4 rounded-xl border-2 border-warm-primary text-warm-primary font-semibold hover:bg-warm-light disabled:opacity-50">{sending ? '发送中…' : cooldown > 0 ? `${cooldown} 秒` : '获取验证码'}</button>
             </div>
           </div>
 
-          <p className="text-sm text-muted">
-            绑定邮箱后，可以用「邮箱验证码」方式登录，忘记密码时也更容易找回。
-          </p>
-
-          <button disabled={saving} className="w-full min-h-[56px] rounded-btn bg-primary hover:bg-primary-strong text-on-primary shadow-btn font-bold disabled:opacity-50">{saving ? '保存中…' : currentEmail ? '更换绑定邮箱' : '绑定邮箱'}</button>
+          <button disabled={saving} className="w-full min-h-[56px] rounded-xl bg-warm-primary hover:bg-warm-dark text-white font-bold disabled:opacity-50">{saving ? '保存中…' : currentEmail ? '更换绑定邮箱' : '绑定邮箱'}</button>
         </form>
-      </SectionCard>
-      </div>
+      </section>
     </div>
   );
 }

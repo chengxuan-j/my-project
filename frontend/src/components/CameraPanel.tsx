@@ -545,17 +545,10 @@ export function CameraPanel({ onClose, onVoice }: CameraPanelProps) {
     : '就绪 · 对着摄像头做动作';
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-black flex flex-col"
-      // 全屏取景：顶部躲开刘海、底部躲开 iPhone 横条，否则按钮点不到
-      style={{
-        paddingTop: 'env(safe-area-inset-top, 0px)',
-        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-      }}
-    >
+    <div className="fixed inset-0 z-50 bg-black flex flex-col">
       {/* 顶部栏 */}
       <div className="flex items-center justify-between px-4 py-3 bg-black/60 gap-3 flex-wrap">
-        <h2 className="text-on-primary font-bold">
+        <h2 className="text-white text-2xl font-bold">
           {mode === 'gesture' ? '🎥 动作指挥小狗' : '😊 表情识别'}
         </h2>
         <div className="flex items-center gap-2">
@@ -565,7 +558,7 @@ export function CameraPanel({ onClose, onVoice }: CameraPanelProps) {
               type="button"
               onClick={() => switchMode('gesture')}
               className={`px-4 py-2 text-sm font-bold transition-colors ${
-                mode === 'gesture' ? 'bg-primary text-white' : 'bg-black/40 text-white/70'
+                mode === 'gesture' ? 'bg-warm-primary text-white' : 'bg-black/40 text-white/70'
               }`}
             >
               🐕 指挥小狗
@@ -574,7 +567,7 @@ export function CameraPanel({ onClose, onVoice }: CameraPanelProps) {
               type="button"
               onClick={() => switchMode('emotion')}
               className={`px-4 py-2 text-sm font-bold transition-colors ${
-                mode === 'emotion' ? 'bg-primary text-white' : 'bg-black/40 text-white/70'
+                mode === 'emotion' ? 'bg-warm-primary text-white' : 'bg-black/40 text-white/70'
               }`}
             >
               😊 表情识别
@@ -582,7 +575,7 @@ export function CameraPanel({ onClose, onVoice }: CameraPanelProps) {
           </div>
           <button
             onClick={handleClose}
-            className="w-12 h-12 rounded-full bg-white/20 text-on-primary font-bold hover:bg-white/30"
+            className="w-12 h-12 rounded-full bg-white/20 text-white text-2xl font-bold hover:bg-white/30"
           >
             ✕
           </button>
@@ -626,14 +619,14 @@ export function CameraPanel({ onClose, onVoice }: CameraPanelProps) {
                         setLoading(true);
                         setCamRetry((n) => n + 1);
                       }}
-                      className="px-6 py-3 rounded-btn bg-success text-white text-lg font-bold"
+                      className="px-6 py-3 rounded-xl bg-emerald-500 text-white text-lg font-bold"
                     >
                       重试
                     </button>
                   )}
                   <button
                     onClick={handleClose}
-                    className="px-6 py-3 rounded-btn bg-card text-black text-lg font-bold"
+                    className="px-6 py-3 rounded-xl bg-white text-black text-lg font-bold"
                   >
                     返回
                   </button>
@@ -648,7 +641,7 @@ export function CameraPanel({ onClose, onVoice }: CameraPanelProps) {
           <>
             {/* 左上角：手势模式 = 当前姿势 + 进度条；表情模式 = 识别结果 */}
             {mode === 'gesture' ? (
-              <div className="absolute top-4 left-4 bg-black/50 rounded-btn px-4 py-3 text-white min-w-[220px]">
+              <div className="absolute top-4 left-4 bg-black/50 rounded-xl px-4 py-3 text-white min-w-[220px]">
                 <p className="text-lg font-bold">
                   {status.currentAction ?? '中立位'}
                 </p>
@@ -664,7 +657,7 @@ export function CameraPanel({ onClose, onVoice }: CameraPanelProps) {
                 <p className="text-sm mt-1 text-white/80">{statusText}</p>
               </div>
             ) : (
-              <div className="absolute top-4 left-4 bg-black/50 rounded-btn px-4 py-3 text-white min-w-[240px]">
+              <div className="absolute top-4 left-4 bg-black/50 rounded-xl px-4 py-3 text-white min-w-[240px]">
                 {faceError ? (
                   <p className="text-amber-300 text-base">{faceError}</p>
                 ) : !faceResult ? (
@@ -719,7 +712,7 @@ export function CameraPanel({ onClose, onVoice }: CameraPanelProps) {
             {/* 右上角：最近动作 */}
             {lastDogAction && Date.now() - lastDogAction.ts < 5000 && (
               <div
-                className={`absolute top-4 right-4 rounded-btn px-4 py-3 text-white text-lg font-bold ${
+                className={`absolute top-4 right-4 rounded-xl px-4 py-3 text-white text-lg font-bold ${
                   lastDogAction.reached ? 'bg-green-600/80' : 'bg-red-600/80'
                 }`}
               >
@@ -766,12 +759,12 @@ export function CameraPanel({ onClose, onVoice }: CameraPanelProps) {
               type="button"
               disabled={voiceProcessing}
               onClick={toggleRecording}
-              className={`w-16 h-16 rounded-pill text-on-primary text-2xl shadow-card transition-all flex items-center justify-center select-none ${
+              className={`w-16 h-16 rounded-full text-white text-2xl shadow-lg transition-all flex items-center justify-center select-none ${
                 recording
                   ? 'bg-red-500 scale-110'
                   : voiceProcessing
-                    ? 'bg-muted'
-                    : 'bg-primary hover:bg-primary-strong hover:scale-105'
+                    ? 'bg-gray-400'
+                    : 'bg-warm-primary hover:bg-warm-dark hover:scale-105'
               }`}
               title={recording ? '点一下结束录音' : '点一下开始说话'}
             >

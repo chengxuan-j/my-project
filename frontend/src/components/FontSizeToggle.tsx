@@ -8,37 +8,25 @@ const OPTIONS: { value: FontSize; label: string; title: string }[] = [
   { value: 'xlarge', label: 'A++', title: '特大字号 24px' },
 ];
 
-/**
- * 字号切换。variant 仅为兼容旧调用点保留：导航栏与抽屉现在都是浅色底，
- * 两种场景共用同一套样式。
- */
-export function FontSizeToggle({ variant = 'onPrimary' }: { variant?: 'onPrimary' | 'onLight' }) {
-  void variant;
+export function FontSizeToggle() {
   const { fontSize, setFontSize } = useSettingsStore();
-
   return (
-    <div
-      className="flex gap-1 rounded-lg p-1 bg-primary-soft"
-      role="group"
-      aria-label="字号"
-    >
-      {OPTIONS.map((opt) => {
-        const active = fontSize === opt.value;
-        return (
-          <button
-            key={opt.value}
-            type="button"
-            onClick={() => setFontSize(opt.value)}
-            title={opt.title}
-            aria-pressed={active}
-            className={`min-h-[44px] min-w-[44px] rounded-md px-2 font-bold ${
-              active ? 'bg-primary text-on-primary' : 'text-muted hover:bg-primary-softer'
-            }`}
-          >
-            {opt.label}
-          </button>
-        );
-      })}
+    <div className="flex gap-1 bg-white/20 rounded-lg p-1">
+      {OPTIONS.map((opt) => (
+        <button
+          key={opt.value}
+          onClick={() => setFontSize(opt.value)}
+          title={opt.title}
+          aria-pressed={fontSize === opt.value}
+          className={`min-h-[40px] min-w-[44px] rounded-md px-2 font-bold ${
+            fontSize === opt.value
+              ? 'bg-white text-warm-primary'
+              : 'text-white hover:bg-white/30'
+          }`}
+        >
+          {opt.label}
+        </button>
+      ))}
     </div>
   );
 }

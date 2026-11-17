@@ -1,7 +1,6 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { Hourglass, Mic, Square } from 'lucide-react';
 import { chatApi, speechApi } from '@/lib/api';
 
 interface Props {
@@ -136,10 +135,10 @@ export function VoiceRecorder({ onRecognized, onError }: Props) {
   };
 
   const cls = recording
-    ? 'bg-danger scale-110 animate-pulse'
+    ? 'bg-red-500 scale-110 animate-pulse'
     : processing
-      ? 'bg-muted'
-      : 'bg-primary hover:bg-primary-strong';
+      ? 'bg-gray-400'
+      : 'bg-warm-primary hover:bg-warm-dark';
 
   const toggleRecording = () => {
     if (processing) return;
@@ -155,17 +154,11 @@ export function VoiceRecorder({ onRecognized, onError }: Props) {
       type="button"
       disabled={processing}
       onClick={toggleRecording}
-      className={`w-20 h-20 rounded-pill text-on-primary shadow-btn transition-all flex items-center justify-center select-none touch-none ${cls}`}
+      className={`w-20 h-20 rounded-full text-white text-3xl shadow-lg transition-all flex items-center justify-center select-none touch-none ${cls}`}
       title={recording ? '点击结束录音' : '点击开始录音'}
       aria-label={recording ? '录音中，点击结束' : '点击开始录音'}
     >
-      {processing ? (
-        <Hourglass aria-hidden className="h-8 w-8" />
-      ) : recording ? (
-        <Square aria-hidden className="h-7 w-7" />
-      ) : (
-        <Mic aria-hidden className="h-8 w-8" />
-      )}
+      {processing ? '⏳' : recording ? '🔴' : '🎤'}
     </button>
   );
 }

@@ -22,18 +22,18 @@ const EMOTION_EMOJI: Record<string, string> = {
 
 // 暖色=好心情，冷色=低落，灰=无记录
 const EMOTION_TONE: Record<string, string> = {
-  happy: 'bg-success-soft border-hairline',
+  happy: 'bg-green-100 border-green-300',
   calm: 'bg-teal-100 border-teal-300',
-  grateful: 'bg-success-soft border-hairline',
+  grateful: 'bg-emerald-100 border-emerald-300',
   nostalgic: 'bg-pink-100 border-pink-300',
-  neutral: 'bg-primary-soft border-hairline',
+  neutral: 'bg-gray-100 border-gray-300',
   bored: 'bg-purple-100 border-purple-300',
-  tired: 'bg-lilac-soft border-hairline',
-  worried: 'bg-warning-soft border-hairline',
-  anxious: 'bg-warning-soft border-hairline',
+  tired: 'bg-slate-100 border-slate-300',
+  worried: 'bg-orange-100 border-orange-300',
+  anxious: 'bg-amber-100 border-amber-300',
   lonely: 'bg-violet-100 border-violet-300',
   sad: 'bg-blue-100 border-blue-300',
-  angry: 'bg-danger-soft border-hairline',
+  angry: 'bg-red-100 border-red-300',
 };
 
 const POSITIVE = new Set(['happy', 'calm', 'grateful', 'nostalgic']);
@@ -66,7 +66,7 @@ export function MoodCalendar() {
 
   if (loading) {
     return (
-      <section className="bg-card rounded-card shadow-card border border-hairline p-6 text-muted">
+      <section className="bg-white rounded-2xl shadow-sm border-2 border-warm-light p-6 text-gray-600">
         📅 正在整理您的心情...
       </section>
     );
@@ -101,29 +101,29 @@ export function MoodCalendar() {
           : `这一周您来过 ${recent7.length} 天，心情有起有落，都是再平常不过的好日子。`;
 
   return (
-    <section className="bg-card rounded-card shadow-card border border-hairline p-6">
-      <h2 className="text-xl font-bold text-ink mb-1">📅 我的心情日历</h2>
-      <p className="text-sm text-muted mb-4">最近两周，每天的心情一目了然</p>
+    <section className="bg-white rounded-2xl shadow-sm border-2 border-warm-light p-6">
+      <h2 className="text-xl font-bold text-gray-900 mb-1">📅 我的心情日历</h2>
+      <p className="text-sm text-gray-500 mb-4">最近两周，每天的心情一目了然</p>
 
       <div className="grid grid-cols-7 gap-2">
         {cells.map((c) => {
           const emo = c.day?.dominant_emotion;
-          const tone = emo ? EMOTION_TONE[emo] || 'bg-primary-soft border-hairline' : 'bg-card-soft border-dashed border-hairline';
+          const tone = emo ? EMOTION_TONE[emo] || 'bg-gray-100 border-gray-300' : 'bg-gray-50 border-dashed border-gray-200';
           return (
             <div
               key={c.date}
-              className={`rounded-btn border ${tone} aspect-square flex flex-col items-center justify-center p-1`}
+              className={`rounded-xl border-2 ${tone} aspect-square flex flex-col items-center justify-center p-1`}
               title={
                 c.day
                   ? `${c.date}：${EMOTION_LABEL[emo!] || emo}（${c.day.record_count} 次）`
                   : `${c.date}：无记录`
               }
             >
-              <span className="text-xs text-muted">周{c.weekday}</span>
+              <span className="text-xs text-gray-500">周{c.weekday}</span>
               <span className="text-2xl leading-none my-0.5">
                 {emo ? EMOTION_EMOJI[emo] || '💭' : '·'}
               </span>
-              <span className="text-[10px] text-muted">
+              <span className="text-[10px] text-gray-500">
                 {c.day ? EMOTION_LABEL[emo!] || emo : ''}
               </span>
             </div>
@@ -131,8 +131,8 @@ export function MoodCalendar() {
         })}
       </div>
 
-      <div className="mt-4 bg-primary-softer rounded-btn px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-        <p className="text-ink flex-1 min-w-[200px]">🌻 {talk}</p>
+      <div className="mt-4 bg-warm-light/50 rounded-xl px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+        <p className="text-gray-800 flex-1 min-w-[200px]">🌻 {talk}</p>
         <SpeakButton text={talk} label="🔊 读给我听" />
       </div>
     </section>

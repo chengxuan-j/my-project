@@ -13,7 +13,7 @@ interface Props {
  * 通用「朗读」按钮：点击后调用后端 TTS 合成并播放，可重复点击（播放/暂停）。
  * 老人友好：大按钮、大字号。
  */
-export function SpeakButton({ text, label = '朗读', className = '' }: Props) {
+export function SpeakButton({ text, label = '🔊 朗读', className = '' }: Props) {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -57,10 +57,10 @@ export function SpeakButton({ text, label = '朗读', className = '' }: Props) {
         type="button"
         onClick={handleClick}
         disabled={loading}
-        className={`min-h-[48px] px-4 rounded-btn bg-primary-soft hover:bg-primary hover:text-on-primary text-primary font-medium disabled:opacity-50 ${className}`}
+        className={`min-h-[48px] px-4 rounded-xl bg-warm-light hover:bg-warm-primary hover:text-white text-warm-primary font-medium disabled:opacity-50 ${className}`}
         aria-label={playing ? '暂停朗读' : label}
       >
-        {loading ? '合成中…' : playing ? '暂停' : label}
+        {loading ? '合成中…' : playing ? '⏸ 暂停' : label}
       </button>
     </span>
   );

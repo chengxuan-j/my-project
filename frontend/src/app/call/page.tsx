@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Flower2, Hourglass, Mic, PhoneOff, Play, Repeat, Square, Upload, Volume2, VolumeX } from 'lucide-react';
 import { ApiError, chatApi, settingsApi, speechApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth';
 
@@ -149,12 +148,12 @@ export default function CallPage() {
       const el = pageRef.current;
       if (!el) return;
       const top = el.getBoundingClientRect().top;
-      // 手机端底部 TabBar 是 fixed 的，会压住视口底部，算可用高度时必须让出来
-      const tabbarH =
-        parseFloat(
-          getComputedStyle(document.documentElement).getPropertyValue('--app-tabbar-h')
-        ) || 0;
-      const next = Math.max(window.innerHeight - top - tabbarH, 400);
+      // 根 layout 是 <main class="pb-8">，下面用 -mb-8 抵掉，这里只扣到视口底；
+      // 移动端再扣掉底部 TabBar 高度（--tab-h，2026-11-05）
+      const tabH = parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue('--tab-h') || '0'
+      );
+      const next = Math.max(window.innerHeight - top - (Number.isFinite(tabH) ? tabH : 0), 400);
       setAvailH((prev) => (prev === null || Math.abs(prev - next) > 1 ? next : prev));
     };
     measure();
@@ -355,6 +354,13 @@ export default function CallPage() {
     if (!auto) stopPlayback();
     stopVad();
     try {
+      // 安全上下文守卫：http://局域网IP 下 mediaDevices 为 undefined，
+      // 若不拦会抛 TypeError 被 catch 成"没权限"，误导用户去查权限。
+      if (typeof window !== 'undefined' && (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia)) {
+        setStage('idle');
+        setHint('当前是 HTTP 地址，浏览器禁用了麦克风。请用 http://localhost:3000 打开（不要用 IP 地址）。');
+        return;
+      }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       if (endedRef.current) {
         stream.getTracks().forEach((t) => t.stop());
@@ -563,7 +569,7 @@ export default function CallPage() {
   if (!hydrated || !accessToken) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
-        <p className="text-xl text-muted">加载中...</p>
+        <p className="text-xl text-gray-600">加载中...</p>
       </div>
     );
   }
@@ -574,94 +580,88 @@ export default function CallPage() {
   return (
     <div
       ref={pageRef}
-      className="call-screen overflow-hidden app-main-bleed app-fill-viewport-bleed"
-      style={{ height: availH ? `${availH}px` : undefined }}
+      className="text-white overflow-hidden -mb-8"
+      style={{
+        background:
+          'radial-gradient(120% 85% at 50% 0%, #3d2a1b 0%, #241a12 45%, #14100c 100%)',
+        height: availH ? `${availH}px` : 'calc(100dvh - var(--nav-h, 72px) - var(--tab-h, 0px))',
+      }}
     >
       <div className="max-w-3xl mx-auto px-4 py-4 h-full flex flex-col overflow-hidden">
-        {/* 顶部：挂断 / 通话状态 / 声音 */}
+        {/* 顶部：挂断 / 计时 / 静音 */}
         <div className="shrink-0 flex items-center justify-between gap-3">
           <button
             type="button"
             onClick={hangUp}
-            className="min-h-[48px] px-4 rounded-pill bg-danger text-on-primary font-bold text-base flex items-center gap-1.5 hover:bg-danger/90"
+            className="min-h-[48px] px-4 rounded-full bg-rose-600 hover:bg-rose-500 font-bold text-base"
           >
-            <PhoneOff aria-hidden className="h-4 w-4" />
-            挂断
+            ⬅ 挂断
           </button>
           <div className="text-center leading-tight">
-            <p className="text-sm call-faint tracking-widest">语音通话</p>
-            <p className="text-xl font-mono tabular-nums call-ink">{mmss(seconds)}</p>
+            <p className="text-sm text-amber-200/70 tracking-widest">语音通话</p>
+            <p className="text-xl font-mono tabular-nums">{mmss(seconds)}</p>
           </div>
           <button
             type="button"
             onClick={() => setSpeakOn((v) => !v)}
             aria-pressed={speakOn}
-            className={`min-h-[48px] px-4 rounded-pill text-base font-bold flex items-center gap-1.5 ${
-              speakOn ? 'call-glass-strong call-ink' : 'call-glass call-faint'
+            className={`min-h-[48px] px-4 rounded-full text-base font-bold ${
+              speakOn ? 'bg-white/15 hover:bg-white/25' : 'bg-white/5 text-white/50'
             }`}
             title={speakOn ? '关闭声音，只看文字' : '打开声音'}
           >
-            {speakOn ? (
-              <>
-                <Volume2 aria-hidden className="h-4 w-4" />
-                有声
-              </>
-            ) : (
-              <>
-                <VolumeX aria-hidden className="h-4 w-4" />
-                静音
-              </>
-            )}
+            {speakOn ? '🔊 有声' : '🔇 静音'}
           </button>
         </div>
 
         {/* 方言选择 */}
         <div className="mt-3 shrink-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm call-faint mr-1">用哪种话说</span>
+            <span className="text-sm text-amber-200/60 mr-1">用哪种话说</span>
             {options.map((name) => (
               <button
                 key={name}
                 type="button"
                 onClick={() => void setDialectTo(name)}
                 aria-pressed={dialect === name}
-                className={`min-h-[44px] px-4 rounded-pill text-base font-medium transition ${
+                className={`min-h-[44px] px-4 rounded-full text-base font-medium transition ${
                   dialect === name
-                    ? 'call-accent font-bold shadow-card'
-                    : 'call-glass call-glass-hover call-ink'
+                    ? 'bg-amber-400 text-[#2a1c10] font-bold shadow-lg shadow-amber-500/20'
+                    : 'bg-white/10 hover:bg-white/20 text-white/85'
                 }`}
               >
                 {name}
               </button>
             ))}
           </div>
-          <p className="text-sm call-faint mt-2">
+          <p className="text-sm text-amber-200/50 mt-2">
             选好方言后：你说的话按方言识别，AI 用方言回你，也用方言念出来。
           </p>
         </div>
 
         {/* 中间：头像 + 状态 */}
         <div className="shrink-0 flex flex-col items-center justify-center gap-2 py-3">
-          <div className="relative w-32 h-32 flex items-center justify-center">
+          <div className="relative w-36 h-36 flex items-center justify-center">
             {ringActive && (
               <>
-                <span className="absolute inset-0 rounded-pill call-ring animate-ping" />
-                <span className="absolute inset-5 rounded-pill call-ring-2" />
+                <span className="absolute inset-0 rounded-full bg-amber-400/25 animate-ping" />
+                <span className="absolute inset-4 rounded-full bg-amber-300/15" />
               </>
             )}
             <div
-              className={`relative w-20 h-20 rounded-pill call-accent flex items-center justify-center shadow-float transition-transform ${
+              className={`relative w-20 h-20 rounded-full flex items-center justify-center text-3xl shadow-2xl transition-transform ${
                 stage === 'speaking' ? 'scale-105' : ''
               }`}
+              style={{ background: 'linear-gradient(135deg,#FBBF24 0%,#F97316 100%)' }}
             >
-              <Flower2 aria-hidden className="h-9 w-9" />
+              🌻
             </div>
           </div>
-          <p className="text-lg call-ink" aria-live="polite">
+          <p className="text-lg text-white/85" aria-live="polite">
             {stage === 'idle' && handsFree ? '我在，接着说就行' : STAGE_TEXT[stage]}
           </p>
-          {notice && <p className="text-base text-warning">{notice}</p>}
-          {hint && <p className="text-base text-danger text-center max-w-md">{hint}</p>}
+          {notice && <p className="text-base text-amber-300">{notice}</p>}
+          {hint && <p className="text-base text-rose-300 text-center max-w-md">{hint}</p>}
         </div>
 
         {/* 字幕区 */}
@@ -669,24 +669,24 @@ export default function CallPage() {
           <div className="flex flex-col gap-3 pt-2">
           {userText && (
             <div className="self-end max-w-[85%] text-right">
-              <p className="text-sm call-faint mb-1">
+              <p className="text-sm text-white/40 mb-1">
                 你说{asrMeta ? ` · 识别 ${asrMeta}` : ''}
               </p>
-              <p className="inline-block text-lg call-glass rounded-card rounded-br-sm px-4 py-2 call-ink">
+              <p className="inline-block text-lg bg-white/10 rounded-2xl rounded-br-sm px-4 py-2 text-white/90">
                 {userText}
               </p>
             </div>
           )}
           {aiText && (
             <div className="self-start max-w-[92%]">
-              <p className="text-sm call-muted mb-1">陪伴 AI</p>
-              <p className="text-2xl leading-relaxed call-ink whitespace-pre-wrap">{aiText}</p>
+              <p className="text-sm text-amber-200/50 mb-1">陪伴 AI</p>
+              <p className="text-2xl leading-relaxed text-white whitespace-pre-wrap">{aiText}</p>
             </div>
           )}
           {!userText && !aiText && (
-            <div className="call-glass rounded-card p-4 border call-border">
-              <p className="text-lg call-ink mb-1">不会说方言也能用</p>
-              <p className="text-base call-muted leading-relaxed">
+            <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
+              <p className="text-lg text-white/85 mb-1">不会说方言也能用</p>
+              <p className="text-base text-white/60 leading-relaxed">
                 点下面的示例录音，就能听到整段方言对话；也可以上传一段家里人说的方言音频。
               </p>
               <div className="flex flex-wrap gap-2 mt-4">
@@ -695,10 +695,9 @@ export default function CallPage() {
                     key={s.key}
                     type="button"
                     onClick={() => void playSample(s.key, s.dialect)}
-                    className="min-h-[48px] px-4 rounded-pill call-accent call-accent-hover font-bold text-base flex items-center gap-1.5"
+                    className="min-h-[48px] px-4 rounded-full bg-amber-400/90 hover:bg-amber-300 text-[#2a1c10] font-bold text-base"
                   >
-                    <Play aria-hidden className="h-4 w-4" />
-                    {s.label}
+                    ▶ {s.label}
                   </button>
                 ))}
               </div>
@@ -707,14 +706,13 @@ export default function CallPage() {
           </div>
         </div>
 
-        {/* 底部控制坞：上传 · 话筒 · 免提 */}
-        <div className="shrink-0 grid grid-cols-3 items-center gap-3 py-3">
+        {/* 底部操作 */}
+        <div className="shrink-0 flex items-center justify-between gap-4 pt-3 pb-1">
           <label
-            className="min-h-[56px] flex items-center justify-center gap-2 rounded-card call-glass call-glass-hover call-ink text-base font-medium cursor-pointer"
+            className="min-h-[56px] min-w-[56px] flex-1 flex items-center justify-center gap-2 rounded-2xl bg-white/10 hover:bg-white/20 text-base font-medium cursor-pointer"
             title="上传一段录音（支持方言）"
           >
-            <Upload aria-hidden className="h-5 w-5" />
-            上传录音
+            <span className="text-xl">📁</span> 上传录音
             <input
               type="file"
               accept="audio/*"
@@ -727,41 +725,32 @@ export default function CallPage() {
             />
           </label>
 
-          <div className="flex justify-center">
-            <button
-              type="button"
-              onClick={toggleMic}
-              disabled={busy}
-              className={`w-[88px] h-[88px] rounded-pill flex items-center justify-center shadow-float transition-all select-none ${
-                busy
-                  ? 'call-glass-strong call-faint'
-                  : stage === 'listening'
-                    ? 'bg-danger text-on-primary animate-pulse scale-105'
-                    : 'call-accent call-accent-hover'
-              }`}
-              aria-label={stage === 'listening' ? '结束说话' : '开始说话'}
-            >
-              {busy ? (
-                <Hourglass aria-hidden className="h-8 w-8" />
-              ) : stage === 'listening' ? (
-                <Square aria-hidden className="h-7 w-7" />
-              ) : (
-                <Mic aria-hidden className="h-8 w-8" />
-              )}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={toggleMic}
+            disabled={busy}
+            className={`w-[88px] h-[88px] rounded-full flex items-center justify-center text-3xl font-bold shadow-2xl transition-all select-none ${
+              busy
+                ? 'bg-white/20 text-white/50'
+                : stage === 'listening'
+                  ? 'bg-rose-500 animate-pulse scale-105'
+                  : 'bg-amber-400 text-[#2a1c10] hover:bg-amber-300'
+            }`}
+            aria-label={stage === 'listening' ? '结束说话' : '开始说话'}
+          >
+            {busy ? '⏳' : stage === 'listening' ? '⏹' : '🎤'}
+          </button>
 
           <button
             type="button"
             onClick={() => setHandsFree((v) => !v)}
             aria-pressed={handsFree}
-            className={`min-h-[56px] rounded-card text-base font-medium flex items-center justify-center gap-2 ${
-              handsFree ? 'bg-success-soft text-success border border-hairline-strong' : 'call-glass call-glass-hover call-ink'
+            className={`min-h-[56px] flex-1 rounded-2xl text-base font-medium ${
+              handsFree ? 'bg-emerald-500/25 text-emerald-200 border border-emerald-400/40' : 'bg-white/10 hover:bg-white/20'
             }`}
             title="说完自动断句、AI 说完自动继续听"
           >
-            <Repeat aria-hidden className="h-5 w-5" />
-            免提：{handsFree ? '开' : '关'}
+            {handsFree ? '🔁 免提：开' : '🔁 免提：关'}
           </button>
         </div>
       </div>

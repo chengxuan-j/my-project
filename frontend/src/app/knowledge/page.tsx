@@ -2,7 +2,6 @@
 
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { FileUp, Library, Search, Sparkles, Trash2 } from 'lucide-react';
 import {
   ApiError,
   ElderlyItem,
@@ -12,11 +11,6 @@ import {
   knowledgeApi,
 } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth';
-import { PageHeader } from '@/components/ui/PageHeader';
-import { SectionCard } from '@/components/ui/SectionCard';
-import { StatCard } from '@/components/ui/StatCard';
-import { Badge } from '@/components/ui/Badge';
-import { EmptyState } from '@/components/ui/EmptyState';
 
 export default function KnowledgePage() {
   const router = useRouter();
@@ -129,7 +123,7 @@ export default function KnowledgePage() {
   };
 
   if (!hydrated || !authReady) {
-    return <div className="min-h-[50vh] flex items-center justify-center text-muted">正在打开知识库…</div>;
+    return <div className="min-h-[50vh] flex items-center justify-center text-gray-500">正在打开知识库…</div>;
   }
   if (!accessToken || user?.role !== 'family') return null;
 
@@ -137,146 +131,77 @@ export default function KnowledgePage() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
-      <PageHeader
-        eyebrow="RAG Knowledge Center"
-        title="陪伴知识库"
-        description="把照护经验和家庭信息整理成 AI 可以检索的可靠资料。"
-        icon={<Library aria-hidden className="h-7 w-7 text-primary" />}
-      />
-
-      <div className="grid grid-cols-2 gap-3 max-w-md">
-        <StatCard label="文档" value={documents.length} unit="篇" icon={<Library aria-hidden className="h-4 w-4" />} />
-        <StatCard label="知识分块" value={totalChunks} unit="块" tone="primary" icon={<Sparkles aria-hidden className="h-4 w-4" />} />
-      </div>
+      <header className="flex items-end justify-between gap-4 flex-wrap">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-amber-600">RAG Knowledge Center</p>
+          <h1 className="text-3xl font-bold text-gray-900 mt-1">陪伴知识库</h1>
+          <p className="text-gray-500 mt-1">把照护经验和家庭信息整理成 AI 可以检索的可靠资料。</p>
+        </div>
+        <div className="flex gap-3">
+          <div className="bg-white border border-slate-200 rounded-2xl px-5 py-3 text-center shadow-sm">
+            <p className="text-2xl font-bold text-gray-900">{documents.length}</p><p className="text-xs text-gray-500">文档</p>
+          </div>
+          <div className="bg-slate-900 rounded-2xl px-5 py-3 text-center shadow-sm">
+            <p className="text-2xl font-bold text-amber-300">{totalChunks}</p><p className="text-xs text-slate-300">知识分块</p>
+          </div>
+        </div>
+      </header>
 
       {(error || message) && (
-        <div className={`rounded-btn px-4 py-3 ${error ? 'bg-danger-soft text-danger' : 'bg-success-soft text-success'}`}>
+        <div className={`rounded-xl border px-4 py-3 ${error ? 'bg-red-50 border-red-200 text-red-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700'}`}>
           {error || message}
         </div>
       )}
 
-      <div className="grid lg:grid-cols-[1.05fr_0.95fr] gap-5 items-start">
-        <SectionCard
-          title="导入知识"
-          icon={<FileUp aria-hidden className="h-5 w-5" />}
-          meta="自动分块 + 向量化"
-        >
-          <form onSubmit={createDocument} className="space-y-4">
-            <div className="grid sm:grid-cols-2 gap-4">
-              <label className="text-sm font-semibold text-ink">文档标题
-                <input value={title} onChange={(e) => setTitle(e.target.value)} className="mt-2 w-full min-h-[48px] px-3 rounded-input border border-hairline focus:border-primary outline-none font-normal bg-card" placeholder="例如：跌倒后的照护流程" />
-              </label>
-              <label className="text-sm font-semibold text-ink">来源
-                <input value={source} onChange={(e) => setSource(e.target.value)} className="mt-2 w-full min-h-[48px] px-3 rounded-input border border-hairline focus:border-primary outline-none font-normal bg-card" placeholder="例如：家庭护理手册" />
-              </label>
-            </div>
-            <div className="grid sm:grid-cols-2 gap-4">
-              <label className="text-sm font-semibold text-ink">共享范围
-                <select value={scope} onChange={(e) => setScope(e.target.value as 'global' | 'elderly')} className="mt-2 w-full min-h-[48px] px-3 rounded-input border border-hairline bg-card font-normal">
-                  <option value="global">我的家庭共享</option><option value="elderly">指定老人专属</option>
-                </select>
-              </label>
-              <label className="text-sm font-semibold text-ink">关联老人
-                <select value={elderlyId} onChange={(e) => setElderlyId(e.target.value)} disabled={!elderly.length} className="mt-2 w-full min-h-[48px] px-3 rounded-input border border-hairline bg-card font-normal disabled:bg-card-soft">
-                  {!elderly.length && <option value="">暂无绑定老人</option>}
-                  {elderly.map((item) => <option key={item.elderly_id} value={item.elderly_id}>{item.name || item.username}</option>)}
-                </select>
-              </label>
-            </div>
-            <label className="block text-sm font-semibold text-ink">知识内容
-              <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={9} className="mt-2 w-full p-4 rounded-card border border-hairline focus:border-primary outline-none resize-y font-normal leading-7 bg-card" placeholder="粘贴经过核实的知识内容……" />
+      <div className="grid lg:grid-cols-[1.05fr_0.95fr] gap-6">
+        <form onSubmit={createDocument} className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-4">
+          <div><h2 className="text-xl font-bold text-gray-900">导入知识</h2><p className="text-sm text-gray-500 mt-1">第一版支持粘贴纯文本，系统会自动分块和向量化。</p></div>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <label className="text-sm font-semibold text-gray-700">文档标题
+              <input value={title} onChange={(e) => setTitle(e.target.value)} className="mt-2 w-full min-h-[48px] px-3 rounded-xl border-2 border-slate-200 focus:border-amber-400 outline-none font-normal" placeholder="例如：跌倒后的照护流程" />
             </label>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-xs text-faint">{content.length.toLocaleString()} / 200,000 字</span>
-              <button disabled={loading} className="min-h-[48px] px-6 rounded-btn bg-primary hover:bg-primary-strong text-on-primary font-bold disabled:opacity-50">
-                {loading ? '处理中…' : '导入并向量化'}
-              </button>
-            </div>
-          </form>
-        </SectionCard>
+            <label className="text-sm font-semibold text-gray-700">来源
+              <input value={source} onChange={(e) => setSource(e.target.value)} className="mt-2 w-full min-h-[48px] px-3 rounded-xl border-2 border-slate-200 focus:border-amber-400 outline-none font-normal" placeholder="例如：家庭护理手册" />
+            </label>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <label className="text-sm font-semibold text-gray-700">共享范围
+              <select value={scope} onChange={(e) => setScope(e.target.value as 'global' | 'elderly')} className="mt-2 w-full min-h-[48px] px-3 rounded-xl border-2 border-slate-200 bg-white font-normal">
+                <option value="global">我的家庭共享</option><option value="elderly">指定老人专属</option>
+              </select>
+            </label>
+            <label className="text-sm font-semibold text-gray-700">关联老人
+              <select value={elderlyId} onChange={(e) => setElderlyId(e.target.value)} disabled={!elderly.length} className="mt-2 w-full min-h-[48px] px-3 rounded-xl border-2 border-slate-200 bg-white font-normal disabled:bg-slate-100">
+                {!elderly.length && <option value="">暂无绑定老人</option>}
+                {elderly.map((item) => <option key={item.elderly_id} value={item.elderly_id}>{item.name || item.username}</option>)}
+              </select>
+            </label>
+          </div>
+          <label className="block text-sm font-semibold text-gray-700">知识内容
+            <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={10} className="mt-2 w-full p-4 rounded-2xl border-2 border-slate-200 focus:border-amber-400 outline-none resize-y font-normal leading-7" placeholder="粘贴经过核实的知识内容……" />
+          </label>
+          <div className="flex items-center justify-between gap-3"><span className="text-xs text-gray-400">{content.length.toLocaleString()} / 200,000 字</span><button disabled={loading} className="min-h-[48px] px-6 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold disabled:opacity-50">{loading ? '处理中…' : '导入并向量化'}</button></div>
+        </form>
 
-        <SectionCard
-          title="检索实验台"
-          icon={<Search aria-hidden className="h-5 w-5" />}
-          meta="查看 RAG 召回了哪些资料"
-        >
-          <form onSubmit={search}>
-            <div className="flex gap-2">
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                className="min-w-0 flex-1 min-h-[48px] px-4 rounded-input bg-card-soft border border-hairline text-ink placeholder:text-faint outline-none focus:border-primary"
-                placeholder="例如：跌倒后该怎么办？"
-              />
-              <button disabled={searching} className="px-5 min-h-[48px] rounded-btn bg-primary text-on-primary font-bold disabled:opacity-50">
-                {searching ? '检索中' : '检索'}
-              </button>
-            </div>
-            <div className="space-y-3 mt-4">
-              {hits.length === 0 ? (
-                <div className="rounded-btn border border-dashed border-hairline p-5 text-center text-sm text-faint">
-                  检索结果会显示在这里
-                </div>
-              ) : (
-                hits.map((hit) => (
-                  <div key={hit.chunk_id} className="rounded-btn bg-card-soft border border-hairline p-4">
-                    <div className="flex justify-between gap-3 items-start">
-                      <strong className="text-ink">{hit.title}</strong>
-                      <Badge tone="success">{Math.round(hit.score * 100)}% 匹配</Badge>
-                    </div>
-                    <p className="text-sm text-muted mt-2 leading-6 line-clamp-4">{hit.content}</p>
-                    <p className="text-xs text-faint mt-2">{hit.source || '未填写来源'}</p>
-                  </div>
-                ))
-              )}
+        <div className="space-y-6">
+          <form onSubmit={search} className="rounded-3xl bg-slate-900 p-6 text-white shadow-lg">
+            <h2 className="text-xl font-bold">检索实验台</h2><p className="text-sm text-slate-300 mt-1">输入老人可能提出的问题，查看 RAG 会召回哪些资料。</p>
+            <div className="flex gap-2 mt-5"><input value={query} onChange={(e) => setQuery(e.target.value)} className="min-w-0 flex-1 min-h-[48px] px-4 rounded-xl bg-white/10 border border-white/20 text-white placeholder:text-slate-400 outline-none focus:border-amber-300" placeholder="例如：跌倒后该怎么办？" /><button disabled={searching} className="px-5 rounded-xl bg-amber-400 text-slate-900 font-bold disabled:opacity-50">{searching ? '检索中' : '检索'}</button></div>
+            <div className="space-y-3 mt-5">
+              {hits.length === 0 ? <div className="rounded-xl border border-dashed border-white/20 p-5 text-center text-sm text-slate-400">检索结果会显示在这里</div> : hits.map((hit) => (
+                <div key={hit.chunk_id} className="rounded-xl bg-white/10 p-4"><div className="flex justify-between gap-3"><strong className="text-amber-200">{hit.title}</strong><span className="text-xs text-emerald-300">{Math.round(hit.score * 100)}% 匹配</span></div><p className="text-sm text-slate-200 mt-2 leading-6 line-clamp-4">{hit.content}</p><p className="text-xs text-slate-400 mt-2">{hit.source || '未填写来源'}</p></div>
+              ))}
             </div>
           </form>
-        </SectionCard>
+        </div>
       </div>
 
-      <SectionCard
-        title="已导入文档"
-        icon={<Library aria-hidden className="h-5 w-5" />}
-        meta={documents.length > 0 ? `${documents.length} 篇` : undefined}
-      >
-        {documents.length === 0 ? (
-          <EmptyState
-            icon={<Library aria-hidden className="h-6 w-6" />}
-            title="还没有知识文档"
-            description="从上方导入第一篇吧，聊天时 AI 会自动检索这里的内容。"
-          />
-        ) : (
-          <div className="grid md:grid-cols-2 gap-4">
-            {documents.map((doc) => (
-              <article key={doc.id} className="rounded-card border border-hairline p-5 hover:border-hairline-strong transition-colors">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Badge tone={doc.scope === 'elderly' ? 'primary' : 'success'}>
-                        {!doc.created_by ? '系统内置' : doc.scope === 'elderly' ? '老人专属' : '家庭共享'}
-                      </Badge>
-                      <span className="text-xs text-faint">{doc.chunk_count} 个分块</span>
-                    </div>
-                    <h3 className="font-bold text-ink mt-3 truncate">{doc.title}</h3>
-                    <p className="text-sm text-muted mt-1 truncate">{doc.source || '未填写来源'}</p>
-                  </div>
-                  {doc.created_by ? (
-                    <button
-                      onClick={() => remove(doc.id)}
-                      className="min-h-[40px] px-3 rounded-btn bg-danger-soft text-danger hover:bg-danger hover:text-on-primary text-sm font-semibold flex items-center gap-1"
-                    >
-                      <Trash2 aria-hidden className="h-3.5 w-3.5" />
-                      删除
-                    </button>
-                  ) : (
-                    <span className="text-xs text-faint pt-2">只读</span>
-                  )}
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-      </SectionCard>
+      <section className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
+        <div className="flex items-center justify-between"><div><h2 className="text-xl font-bold text-gray-900">已导入文档</h2><p className="text-sm text-gray-500 mt-1">聊天时会自动检索，无需手动开启。</p></div></div>
+        {documents.length === 0 ? <div className="mt-5 rounded-2xl bg-slate-50 p-8 text-center text-gray-500">还没有知识文档，从上方导入第一篇吧。</div> : <div className="grid md:grid-cols-2 gap-4 mt-5">{documents.map((doc) => (
+          <article key={doc.id} className="rounded-2xl border border-slate-200 p-5 hover:border-amber-300 transition-colors"><div className="flex items-start justify-between gap-4"><div className="min-w-0"><div className="flex items-center gap-2"><span className={`text-xs font-bold rounded-full px-2 py-1 ${doc.scope === 'elderly' ? 'bg-violet-50 text-violet-700' : 'bg-cyan-50 text-cyan-700'}`}>{!doc.created_by ? '系统内置' : doc.scope === 'elderly' ? '老人专属' : '家庭共享'}</span><span className="text-xs text-gray-400">{doc.chunk_count} 个分块</span></div><h3 className="font-bold text-gray-900 mt-3 truncate">{doc.title}</h3><p className="text-sm text-gray-500 mt-1 truncate">{doc.source || '未填写来源'}</p></div>{doc.created_by ? <button onClick={() => remove(doc.id)} className="min-h-[40px] px-3 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 text-sm font-semibold">删除</button> : <span className="text-xs text-gray-400 pt-2">只读</span>}</div></article>
+        ))}</div>}
+      </section>
     </div>
   );
 }

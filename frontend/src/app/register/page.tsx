@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { authApi, ApiError } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth';
 import { LargeButton } from '@/components/LargeButton';
-import { Flower2, PartyPopper, ShieldCheck, User, Users } from 'lucide-react';
 
 type Role = 'elderly' | 'family';
 
@@ -108,18 +107,16 @@ export default function RegisterPage() {
   // 注册成功且是老人：显示邀请码
   if (successInfo) {
     return (
-      <div className="app-min-screen flex items-center justify-center px-4 py-8">
-        <div className="w-full max-w-md bg-card rounded-card shadow-card p-8 border border-hairline text-center space-y-6">
-          <div className="flex justify-center">
-            <PartyPopper aria-hidden className="h-16 w-16 text-warning" />
-          </div>
-          <h1 className="text-2xl font-bold text-primary">注册成功！</h1>
-          <div className="bg-butter rounded-card p-6">
-            <p className="text-ink mb-3">您的专属邀请码（请告诉家人）：</p>
-            <p className="text-4xl font-mono font-bold text-primary tracking-widest">
+      <div className="min-h-[calc(100vh-64px)] flex items-center justify-center px-4 py-8">
+        <div className="w-full max-w-md bg-white rounded-3xl shadow-lg p-8 border-2 border-warm-light text-center space-y-6">
+          <div className="text-6xl">🎉</div>
+          <h1 className="text-2xl font-bold text-warm-primary">注册成功！</h1>
+          <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-6">
+            <p className="text-gray-700 mb-3">您的专属邀请码（请告诉家人）：</p>
+            <p className="text-4xl font-mono font-bold text-warm-primary tracking-widest">
               {successInfo}
             </p>
-            <p className="text-sm text-muted mt-3">
+            <p className="text-sm text-gray-500 mt-3">
               家属用您的用户名 <b>{username}</b> + 这个邀请码，就能绑定查看您的状态
             </p>
           </div>
@@ -132,55 +129,12 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="app-min-screen grid lg:grid-cols-[1.05fr_1fr]">
-      {/* ---------- 桌面品牌区 ---------- */}
-      <aside className="relative hidden lg:flex flex-col justify-between overflow-hidden bg-primary p-12 text-on-primary">
-        <div
-          aria-hidden
-          className="absolute -top-24 -right-24 h-72 w-72 rounded-pill bg-white/10"
-        />
-        <div
-          aria-hidden
-          className="absolute bottom-16 -left-16 h-56 w-56 rounded-pill bg-white/10"
-        />
-        <div className="relative flex items-center gap-2.5 text-xl font-bold">
-          <Flower2 aria-hidden className="h-7 w-7" />
-          陪伴 AI
-        </div>
-        <div className="relative">
-          <h2 className="font-display text-4xl font-bold leading-snug">
-            一分钟注册，
-            <br />
-            让陪伴从今天开始
-          </h2>
-          <ul className="mt-8 space-y-4 text-base/relaxed text-on-primary/85">
-            <li className="flex items-center gap-3">
-              <User aria-hidden className="h-5 w-5 shrink-0" />
-              老人端：大字、语音、方言，怎么方便怎么来
-            </li>
-            <li className="flex items-center gap-3">
-              <Users aria-hidden className="h-5 w-5 shrink-0" />
-              家属端：用邀请码绑定，远程关注状态
-            </li>
-            <li className="flex items-center gap-3">
-              <ShieldCheck aria-hidden className="h-5 w-5 shrink-0" />
-              聊天内容只用于陪伴，不做其他用途
-            </li>
-          </ul>
-        </div>
-        <p className="relative text-sm text-on-primary/60">老人情感陪伴 AI · Demo</p>
-      </aside>
-
-      {/* ---------- 表单区 ---------- */}
-      <main className="flex items-center justify-center px-4 py-8">
-        <div className="w-full max-w-md">
-          <div className="mb-6 flex items-center justify-center gap-2 text-primary lg:hidden">
-            <Flower2 aria-hidden className="h-7 w-7" />
-            <span className="text-xl font-bold">陪伴 AI</span>
-          </div>
-
-          <h1 className="text-3xl font-bold text-ink mb-1.5">注册账号</h1>
-          <p className="text-muted mb-6">选择您的身份</p>
+    <div className="min-h-[calc(100vh-64px)] flex items-center justify-center px-4 py-8">
+      <div className="w-full max-w-md bg-white rounded-3xl shadow-lg p-8 border-2 border-warm-light">
+        <h1 className="text-3xl font-bold text-center text-warm-primary mb-2">
+          🌻 注册账号
+        </h1>
+        <p className="text-center text-gray-600 mb-6">选择您的身份</p>
 
         {/* 角色选择 */}
         <div className="grid grid-cols-2 gap-3 mb-6">
@@ -188,59 +142,57 @@ export default function RegisterPage() {
             type="button"
             onClick={() => setRole('elderly')}
             aria-pressed={role === 'elderly'}
-            className={`inline-flex min-h-[80px] items-center justify-center gap-2 rounded-card border font-bold text-xl transition-colors ${
+            className={`min-h-[80px] rounded-2xl border-3 font-bold text-xl transition-colors ${
               role === 'elderly'
-                ? 'bg-primary text-on-primary border-primary'
-                : 'bg-card text-ink border-hairline hover:border-primary'
+                ? 'bg-warm-primary text-white border-warm-primary'
+                : 'bg-white text-gray-700 border-warm-light hover:border-warm-primary'
             }`}
           >
-            <User aria-hidden className="h-6 w-6" />
-            我是老人
+            👴 我是老人
           </button>
           <button
             type="button"
             onClick={() => setRole('family')}
             aria-pressed={role === 'family'}
-            className={`inline-flex min-h-[80px] items-center justify-center gap-2 rounded-card border font-bold text-xl transition-colors ${
+            className={`min-h-[80px] rounded-2xl border-3 font-bold text-xl transition-colors ${
               role === 'family'
-                ? 'bg-primary text-on-primary border-primary'
-                : 'bg-card text-ink border-hairline hover:border-primary'
+                ? 'bg-warm-primary text-white border-warm-primary'
+                : 'bg-white text-gray-700 border-warm-light hover:border-warm-primary'
             }`}
           >
-            <Users aria-hidden className="h-6 w-6" />
-            我是家属
+            👨‍👩‍👧 我是家属
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="reg-username" className="block mb-2 font-medium text-ink">
-              用户名 <span className="text-danger">*</span>
+            <label htmlFor="reg-username" className="block mb-2 font-medium text-gray-700">
+              用户名 <span className="text-red-500">*</span>
             </label>
             <input
               id="reg-username"
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full min-h-[56px] px-4 rounded-input border border-hairline focus:border-primary outline-none"
+              className="w-full min-h-[56px] px-4 rounded-xl border-2 border-warm-light focus:border-warm-primary outline-none"
               autoComplete="username"
             />
           </div>
           <div>
-            <label htmlFor="reg-password" className="block mb-2 font-medium text-ink">
-              密码 <span className="text-danger">*</span>
+            <label htmlFor="reg-password" className="block mb-2 font-medium text-gray-700">
+              密码 <span className="text-red-500">*</span>
             </label>
             <input
               id="reg-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full min-h-[56px] px-4 rounded-input border border-hairline focus:border-primary outline-none"
+              className="w-full min-h-[56px] px-4 rounded-xl border-2 border-warm-light focus:border-warm-primary outline-none"
               autoComplete="new-password"
             />
           </div>
           <div>
-            <label htmlFor="reg-email" className="block mb-2 font-medium text-ink">
+            <label htmlFor="reg-email" className="block mb-2 font-medium text-gray-700">
               邮箱（可选，用于验证码登录）
             </label>
             <input
@@ -248,7 +200,7 @@ export default function RegisterPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full min-h-[56px] px-4 rounded-input border border-hairline focus:border-primary outline-none"
+              className="w-full min-h-[56px] px-4 rounded-xl border-2 border-warm-light focus:border-warm-primary outline-none"
               placeholder="name@example.com"
               autoComplete="email"
             />
@@ -260,7 +212,7 @@ export default function RegisterPage() {
                   inputMode="numeric"
                   value={emailCode}
                   onChange={(e) => setEmailCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  className="min-w-0 min-h-[52px] px-4 rounded-input border border-hairline focus:border-primary outline-none tracking-widest"
+                  className="min-w-0 min-h-[52px] px-4 rounded-xl border-2 border-warm-light focus:border-warm-primary outline-none tracking-widest"
                   placeholder="6 位邮箱验证码"
                   autoComplete="one-time-code"
                 />
@@ -268,7 +220,7 @@ export default function RegisterPage() {
                   type="button"
                   onClick={handleSendEmailCode}
                   disabled={sendingCode || cooldown > 0}
-                  className="min-w-[120px] min-h-[52px] px-4 rounded-btn border border-primary text-primary font-semibold hover:bg-primary-soft disabled:opacity-50"
+                  className="min-w-[120px] min-h-[52px] px-4 rounded-xl border-2 border-warm-primary text-warm-primary font-semibold hover:bg-warm-light disabled:opacity-50"
                 >
                   {sendingCode ? '发送中…' : cooldown > 0 ? `${cooldown} 秒` : '获取验证码'}
                 </button>
@@ -276,7 +228,7 @@ export default function RegisterPage() {
             )}
           </div>
           <div>
-            <label htmlFor="reg-name" className="block mb-2 font-medium text-ink">
+            <label htmlFor="reg-name" className="block mb-2 font-medium text-gray-700">
               称呼（如：王奶奶）
             </label>
             <input
@@ -284,12 +236,12 @@ export default function RegisterPage() {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full min-h-[56px] px-4 rounded-input border border-hairline focus:border-primary outline-none"
+              className="w-full min-h-[56px] px-4 rounded-xl border-2 border-warm-light focus:border-warm-primary outline-none"
             />
           </div>
           {role === 'family' && (
             <div>
-              <label htmlFor="reg-invite" className="block mb-2 font-medium text-ink">
+              <label htmlFor="reg-invite" className="block mb-2 font-medium text-gray-700">
                 老人邀请码（可选，注册后再绑定也行）
               </label>
               <input
@@ -297,18 +249,18 @@ export default function RegisterPage() {
                 type="text"
                 value={inviteCode}
                 onChange={(e) => setInviteCode(e.target.value)}
-                className="w-full min-h-[56px] px-4 rounded-input border border-hairline focus:border-primary outline-none"
+                className="w-full min-h-[56px] px-4 rounded-xl border-2 border-warm-light focus:border-warm-primary outline-none"
               />
             </div>
           )}
 
           {error && (
-            <div className="bg-danger-soft text-danger rounded-btn px-4 py-3">
+            <div className="bg-red-50 border-2 border-red-300 text-red-700 rounded-xl px-4 py-3">
               {error}
             </div>
           )}
           {notice && (
-            <div className="bg-success-soft text-success rounded-btn px-4 py-3">
+            <div className="bg-green-50 border-2 border-green-200 text-green-700 rounded-xl px-4 py-3">
               {notice}
             </div>
           )}
@@ -318,14 +270,13 @@ export default function RegisterPage() {
           </LargeButton>
         </form>
 
-        <p className="text-center mt-6 text-muted">
+        <p className="text-center mt-6 text-gray-600">
           已有账号？{' '}
-          <Link href="/login" className="text-primary font-bold underline">
+          <Link href="/login" className="text-warm-primary font-bold underline">
             去登录
           </Link>
         </p>
-        </div>
-      </main>
+      </div>
     </div>
   );
 }

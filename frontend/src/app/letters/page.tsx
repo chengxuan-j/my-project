@@ -2,18 +2,14 @@
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { BookOpen, ChevronUp, Lock, Mail, PenLine, User, Users } from 'lucide-react';
 import { ApiError, TimeLetter, letterApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth';
 import { useServerEvents } from '@/lib/events';
 import { LargeButton } from '@/components/LargeButton';
-import { PageHeader } from '@/components/ui/PageHeader';
-import { SectionCard } from '@/components/ui/SectionCard';
-import { Badge } from '@/components/ui/Badge';
 
 const inputCls =
-  'w-full min-h-[52px] rounded-input border border-hairline px-4 text-lg text-ink ' +
-  'focus:outline-none focus:border-primary bg-card';
+  'w-full min-h-[52px] rounded-xl border-2 border-warm-light px-4 text-lg text-gray-900 ' +
+  'focus:outline-none focus:border-warm-primary bg-white';
 
 function pad(n: number): string {
   return String(n).padStart(2, '0');
@@ -195,39 +191,34 @@ export default function LettersPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6 space-y-5">
-      <PageHeader
-        eyebrow="写给未来"
-        title="时光信笺"
-        description="现在写一句话，锁起来。到了那天，你或者家人才能打开。"
-        icon={<Mail aria-hidden className="h-7 w-7 text-primary" />}
-        actions={
-          <LargeButton
-            onClick={() => {
-              setShowForm((v) => !v);
-              if (!showForm) resetForm();
-            }}
-          >
-            {showForm ? (
-              <>
-                <ChevronUp aria-hidden className="h-5 w-5" /> 收起
-              </>
-            ) : (
-              <>
-                <PenLine aria-hidden className="h-5 w-5" /> 写一封信
-              </>
-            )}
-          </LargeButton>
-        }
-      />
+    <div className="max-w-3xl mx-auto px-4 py-6 space-y-5">
+      <div className="flex items-end justify-between gap-4 flex-wrap">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-amber-600">
+            写给未来
+          </p>
+          <h1 className="text-3xl font-bold text-gray-900 mt-1">💌 时光信笺</h1>
+          <p className="text-gray-500 mt-1">
+            现在写一句话，锁起来。到了那天，你或者家人才能打开。
+          </p>
+        </div>
+        <LargeButton
+          onClick={() => {
+            setShowForm((v) => !v);
+            if (!showForm) resetForm();
+          }}
+        >
+          {showForm ? '收起' : '✍️ 写一封信'}
+        </LargeButton>
+      </div>
 
       {error && (
-        <div className="rounded-card bg-danger-soft text-danger px-4 py-3">
+        <div className="rounded-xl bg-rose-50 border-2 border-rose-200 text-rose-700 px-4 py-3">
           {error}
         </div>
       )}
       {notice && (
-        <div className="rounded-card bg-success-soft text-success px-4 py-3">
+        <div className="rounded-xl bg-emerald-50 border-2 border-emerald-200 text-emerald-700 px-4 py-3">
           {notice}
         </div>
       )}
@@ -235,9 +226,9 @@ export default function LettersPage() {
       {showForm && (
         <section
           ref={formRef}
-          className="bg-card rounded-card shadow-card border border-hairline p-5"
+          className="bg-white rounded-2xl shadow-sm border-2 border-warm-light p-5"
         >
-          <h2 className="text-xl font-bold text-ink">
+          <h2 className="text-xl font-bold text-gray-900">
             {editingId !== null ? '改这封信' : '写一封新的'}
           </h2>
           <form onSubmit={handleSubmit} className="mt-4 space-y-4">
@@ -245,32 +236,30 @@ export default function LettersPage() {
               <button
                 type="button"
                 onClick={() => setRecipientType('self')}
-                className={`min-h-[56px] rounded-btn border text-lg font-medium inline-flex items-center justify-center gap-1.5 ${
+                className={`min-h-[56px] rounded-xl border-2 text-lg font-medium ${
                   recipientType === 'self'
-                    ? 'border-primary bg-primary-soft text-primary'
-                    : 'border-hairline bg-card text-muted'
+                    ? 'border-warm-primary bg-warm-light text-warm-dark'
+                    : 'border-warm-light bg-white text-gray-600'
                 }`}
               >
-                <User aria-hidden className="h-5 w-5" />
-                给未来的自己
+                🧓 给未来的自己
               </button>
               <button
                 type="button"
                 onClick={() => setRecipientType('family')}
-                className={`min-h-[56px] rounded-btn border text-lg font-medium inline-flex items-center justify-center gap-1.5 ${
+                className={`min-h-[56px] rounded-xl border-2 text-lg font-medium ${
                   recipientType === 'family'
-                    ? 'border-primary bg-primary-soft text-primary'
-                    : 'border-hairline bg-card text-muted'
+                    ? 'border-warm-primary bg-warm-light text-warm-dark'
+                    : 'border-warm-light bg-white text-gray-600'
                 }`}
               >
-                <Users aria-hidden className="h-5 w-5" />
-                给家人
+                👨‍👩‍👧 给家人
               </button>
             </div>
 
             {recipientType === 'family' && (
               <label className="block">
-                <span className="text-sm text-muted">给谁（写个称呼）</span>
+                <span className="text-sm text-gray-600">给谁（写个称呼）</span>
                 <input
                   className={inputCls}
                   value={recipientName}
@@ -282,7 +271,7 @@ export default function LettersPage() {
             )}
 
             <label className="block">
-              <span className="text-sm text-muted">标题（可不填）</span>
+              <span className="text-sm text-gray-600">标题（可不填）</span>
               <input
                 className={inputCls}
                 value={title}
@@ -292,9 +281,9 @@ export default function LettersPage() {
             </label>
 
             <label className="block">
-              <span className="text-sm text-muted">想说的话</span>
+              <span className="text-sm text-gray-600">想说的话</span>
               <textarea
-                className="w-full min-h-[160px] rounded-input border border-hairline px-4 py-3 text-lg text-ink focus:outline-none focus:border-primary"
+                className="w-full min-h-[160px] rounded-xl border-2 border-warm-light px-4 py-3 text-lg text-gray-900 focus:outline-none focus:border-warm-primary"
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 placeholder="慢慢写，想到什么写什么…"
@@ -304,7 +293,7 @@ export default function LettersPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <label className="block">
-                <span className="text-sm text-muted">哪天打开</span>
+                <span className="text-sm text-gray-600">哪天打开</span>
                 <input
                   className={inputCls}
                   type="datetime-local"
@@ -314,37 +303,35 @@ export default function LettersPage() {
                 />
               </label>
               <div>
-                <span className="text-sm text-muted">到时候谁能看</span>
+                <span className="text-sm text-gray-600">到时候谁能看</span>
                 <div className="mt-1 grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => setVisibility('private')}
-                    className={`min-h-[52px] rounded-btn border text-base inline-flex items-center justify-center gap-1.5 ${
+                    className={`min-h-[52px] rounded-xl border-2 text-base ${
                       visibility === 'private'
-                        ? 'border-primary bg-primary-soft text-primary'
-                        : 'border-hairline bg-card text-muted'
+                        ? 'border-warm-primary bg-warm-light text-warm-dark'
+                        : 'border-warm-light bg-white text-gray-600'
                     }`}
                   >
-                    <Lock aria-hidden className="h-5 w-5" />
-                    只有我
+                    🔒 只有我
                   </button>
                   <button
                     type="button"
                     onClick={() => setVisibility('family')}
-                    className={`min-h-[52px] rounded-btn border text-base inline-flex items-center justify-center gap-1.5 ${
+                    className={`min-h-[52px] rounded-xl border-2 text-base ${
                       visibility === 'family'
-                        ? 'border-primary bg-primary-soft text-primary'
-                        : 'border-hairline bg-card text-muted'
+                        ? 'border-warm-primary bg-warm-light text-warm-dark'
+                        : 'border-warm-light bg-white text-gray-600'
                     }`}
                   >
-                    <Users aria-hidden className="h-5 w-5" />
-                    家人也能看
+                    👨‍👩‍👧 家人也能看
                   </button>
                 </div>
               </div>
             </div>
 
-            <p className="text-sm text-muted">
+            <p className="text-sm text-gray-500">
               没到日子之前，信的内容谁也看不到，家人也看不到。到了那天才会打开。
             </p>
 
@@ -371,29 +358,25 @@ export default function LettersPage() {
       )}
 
       {loading ? (
-        <p className="text-center text-muted py-12 text-lg">正在翻看你的信…</p>
+        <p className="text-center text-gray-500 py-12 text-lg">正在翻看你的信…</p>
       ) : (
         <>
           {/* 到点了、还没拆 */}
           {delivered.length > 0 && (
-            <SectionCard
-              title="有信可以拆了"
-              icon={<Mail aria-hidden className="h-5 w-5" />}
-              meta={`${delivered.length} 封`}
-              className="bg-butter border-warning-soft"
-            >
-              <ul className="space-y-3">
+            <section className="bg-amber-50 rounded-2xl border-2 border-amber-300 p-5">
+              <h2 className="text-xl font-bold text-gray-900">✉️ 有信可以拆了</h2>
+              <ul className="mt-4 space-y-3">
                 {delivered.map((l) => (
-                  <li key={l.id} className="bg-card rounded-card shadow-card border border-hairline p-4">
-                    <p className="text-lg font-bold text-ink">
+                  <li key={l.id} className="bg-white rounded-xl border border-amber-200 p-4">
+                    <p className="text-lg font-bold text-gray-900">
                       {l.title || '一封信'}
-                      <span className="ml-2 text-sm font-normal text-muted">
+                      <span className="ml-2 text-sm font-normal text-gray-500">
                         {l.recipient_type === 'family'
                           ? `写给${l.recipient_name || '家人'}`
                           : '写给未来的自己'}
                       </span>
                     </p>
-                    <p className="text-sm text-muted mt-1">
+                    <p className="text-sm text-gray-500 mt-1">
                       写于 {fmtDate(l.created_at)} · {fmtDate(l.deliver_at)} 到
                     </p>
                     <LargeButton
@@ -406,48 +389,42 @@ export default function LettersPage() {
                   </li>
                 ))}
               </ul>
-            </SectionCard>
+            </section>
           )}
 
-          {/* 未到时间 + 已拆：桌面端双列 */}
-          <div className="grid lg:grid-cols-2 gap-5 items-start">
-          <SectionCard
-            title="还没到日子的信"
-            icon={<Lock aria-hidden className="h-5 w-5" />}
-            meta={scheduled.length > 0 ? `${scheduled.length} 封` : undefined}
-          >
+          {/* 未到时间 */}
+          <section className="bg-white rounded-2xl shadow-sm border-2 border-warm-light p-5">
+            <h2 className="text-xl font-bold text-gray-900">🔒 还没到日子的信</h2>
             {scheduled.length === 0 ? (
-              <p className="text-muted">还没有封起来的信。想写就点右上角。</p>
+              <p className="text-gray-600 mt-3">还没有封起来的信。想写就点右上角。</p>
             ) : (
-              <ul className="space-y-3">
+              <ul className="mt-4 space-y-3">
                 {scheduled.map((l) => (
                   <li
                     key={l.id}
-                    className="rounded-btn border border-hairline bg-primary-softer px-4 py-4"
+                    className="rounded-xl border-2 border-warm-light bg-warm-light/20 px-4 py-4"
                   >
                     <div className="flex items-start justify-between gap-3 flex-wrap">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="text-lg font-bold text-ink">
-                            {l.title || '一封信'}
-                          </p>
-                          <Badge tone="primary">
+                      <div>
+                        <p className="text-lg font-bold text-gray-900">
+                          {l.title || '一封信'}
+                          <span className="ml-2 text-sm font-normal text-gray-500">
                             {l.recipient_type === 'family'
                               ? `写给${l.recipient_name || '家人'}`
                               : '写给未来的自己'}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-muted mt-1">
+                          </span>
+                        </p>
+                        <p className="text-sm text-gray-600 mt-1">
                           {fmtDate(l.deliver_at)} 打开 · {countdown(l)} ·{' '}
                           {l.visibility === 'family' ? '家人也能看' : '只有我能看'}
                         </p>
-                        <p className="text-sm text-faint mt-1">内容封存中，到日子才能看</p>
+                        <p className="text-sm text-gray-400 mt-1">内容封存中，到日子才能看</p>
                       </div>
                       <div className="flex gap-2">
                         <button
                           type="button"
                           onClick={() => startEdit(l)}
-                          className="min-h-[44px] px-3 rounded-btn text-primary hover:bg-primary-soft"
+                          className="min-h-[44px] px-3 rounded-lg text-warm-dark hover:bg-warm-light"
                         >
                           改一下
                         </button>
@@ -455,7 +432,7 @@ export default function LettersPage() {
                           type="button"
                           onClick={() => handleDelete(l)}
                           disabled={busy === `del-${l.id}`}
-                          className="min-h-[44px] px-3 rounded-btn text-danger hover:bg-danger-soft"
+                          className="min-h-[44px] px-3 rounded-lg text-rose-600 hover:bg-rose-50"
                         >
                           删除
                         </button>
@@ -465,36 +442,32 @@ export default function LettersPage() {
                 ))}
               </ul>
             )}
-          </SectionCard>
+          </section>
 
           {/* 拆过的 */}
           {read.length > 0 && (
-            <SectionCard
-              title="拆过的信"
-              icon={<BookOpen aria-hidden className="h-5 w-5" />}
-              meta={`${read.length} 封`}
-            >
-              <ul className="space-y-4">
+            <section className="bg-white rounded-2xl shadow-sm border-2 border-warm-light p-5">
+              <h2 className="text-xl font-bold text-gray-900">📖 拆过的信</h2>
+              <ul className="mt-4 space-y-4">
                 {read.map((l) => (
-                  <li key={l.id} className="rounded-btn bg-primary-softer border border-hairline p-4">
-                    <p className="text-lg font-bold text-ink">
+                  <li key={l.id} className="rounded-xl bg-warm-light/30 border border-warm-light p-4">
+                    <p className="text-lg font-bold text-gray-900">
                       {l.title || '一封信'}
                     </p>
-                    <p className="text-sm text-muted mt-1">
+                    <p className="text-sm text-gray-500 mt-1">
                       {l.recipient_type === 'family'
                         ? `写给${l.recipient_name || '家人'}`
                         : '写给未来的自己'}{' '}
                       · {fmtDate(l.deliver_at)} 打开
                     </p>
-                    <p className="mt-3 text-ink whitespace-pre-wrap leading-relaxed">
+                    <p className="mt-3 text-gray-800 whitespace-pre-wrap leading-relaxed">
                       {l.content}
                     </p>
                   </li>
                 ))}
               </ul>
-            </SectionCard>
+            </section>
           )}
-          </div>
         </>
       )}
     </div>

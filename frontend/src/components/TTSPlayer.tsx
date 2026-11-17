@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Pause, Volume2 } from 'lucide-react';
 import { speechApi } from '@/lib/api';
 
 interface Props {
@@ -60,15 +59,11 @@ export function TTSPlayer({ text, autoPlay = true }: Props) {
           if (playing) audioRef.current?.pause();
           else audioRef.current?.play().catch(() => {});
         }}
-        className="min-h-[48px] min-w-[48px] rounded-pill bg-primary-soft hover:bg-primary hover:text-on-primary text-primary flex items-center justify-center"
+        className="min-h-[48px] min-w-[48px] rounded-full bg-warm-light hover:bg-warm-primary hover:text-white text-warm-primary text-2xl flex items-center justify-center"
         title={playing ? '暂停' : '播放语音'}
         aria-label={playing ? '暂停语音' : '播放语音'}
       >
-        {playing ? (
-          <Pause aria-hidden className="h-5 w-5" />
-        ) : (
-          <Volume2 aria-hidden className="h-5 w-5" />
-        )}
+        {playing ? '⏸' : '🔊'}
       </button>
     </div>
   );
