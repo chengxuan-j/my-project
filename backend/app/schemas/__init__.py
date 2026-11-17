@@ -277,6 +277,45 @@ class StoryActionRequest(BaseModel):
     via: str = Field(default="button", pattern="^(button|voice)$")
 
 
+class StoryTurn(BaseModel):
+    """对话式讲故事的一轮：老人说的话，或小忆的追问。"""
+
+    role: str = Field(pattern="^(user|assistant)$")
+    content: str = Field(min_length=1, max_length=2000)
+
+
+class StoryManualCreateRequest(BaseModel):
+    """短片素材库里由老人主动保存的一段故事。
+
+    不经过 LLM 改写：正文同时进入 summary 与 raw_dialogue，确保用户保存什么、
+    后续故事板就看到什么。input_type 只记录入口，不影响存储内容。
+
+    `turns` 用于对话式讲故事：老人原话与小忆的追问按顺序留底，
+    这样回看时能看清"这句话是在回答什么"，也便于日后接着补。
+    """
+    title: str = Field(default="", max_length=80)
+    content: str = Field(min_length=2, max_length=5000)
+    input_type: str = Field(default="text", pattern="^(text|voice)$")
+    # 演示剧本一段就 60~70 句，上限给足；只防超大请求，不做体验限制
+    turns: list[StoryTurn] = Field(default_factory=list, max_length=300)
+
+
+class StoryDraftNextRequest(BaseModel):
+    """请求下一句追问：带上到目前为止的全部对话，服务端不存状态。"""
+    turns: list[StoryTurn] = Field(min_length=1, max_length=300)
+
+
+class StoryDraftNextResponse(BaseModel):
+    """小忆的下一句。
+
+    `done` 恒为 False——对话不设轮次上限、不自动收尾，保留该字段只为兼容旧前端。
+    """
+    question: str
+    focus: str = "progress"
+    done: bool = False
+    source: str = "llm"  # llm / rule，便于排查"这句话是谁问的"
+
+
 class TimelineStory(StoryItem):
     """时间轴上的故事卡片。
 

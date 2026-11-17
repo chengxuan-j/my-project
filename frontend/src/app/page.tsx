@@ -445,17 +445,17 @@ export default function ChatPage() {
   const visibleFamInbox = famInbox.filter((m) => m.category !== 'dog_relay');
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-4 flex flex-col h-[calc(100vh-72px)]">
-      {/* 顶部状态栏 */}
+    <div className="max-w-3xl mx-auto px-4 py-4 flex flex-col h-[calc(100dvh-var(--nav-h,72px)-var(--tab-h,0px))]">
+      {/* 顶部状态栏：手机端压缩为一行（2026-11-04 移动端界面优化） */}
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-        <h1 className="text-2xl font-bold text-warm-primary">
-          💬 {user?.name || user?.username || '您'} 的贴心陪伴
+        <h1 className="text-xl md:text-2xl font-bold text-warm-primary">
+          {user?.name || user?.username || '您'}的贴心陪伴
         </h1>
         <div className="flex items-center gap-2">
           <button
             onClick={toggleAutoTTS}
             aria-pressed={autoTTS}
-            className="min-h-[48px] px-4 rounded-xl bg-white border-2 border-warm-primary text-warm-primary font-medium"
+            className="min-h-[44px] px-3 rounded-xl bg-white border-2 border-warm-primary text-warm-primary font-medium text-base"
             title={autoTTS ? '关闭自动语音播报' : '开启自动语音播报'}
           >
             {autoTTS ? '🔊 自动播报' : '🔇 静音'}
@@ -760,17 +760,29 @@ export default function ChatPage() {
         </div>
       )}
 
-      {/* 快捷推荐 + 拍照看看 */}
+      {/* 快捷推荐 + 拍照看看：手机端窄屏下强制单行不换行（2026-11-04） */}
       <div className="flex gap-2 mb-3">
-        <LargeButton variant="secondary" onClick={() => handleRecommend('music')} className="flex-1">
+        <button
+          type="button"
+          onClick={() => handleRecommend('music')}
+          className="flex-1 min-w-0 min-h-[48px] px-1 rounded-xl bg-white border-2 border-warm-primary text-warm-primary font-medium text-base whitespace-nowrap overflow-hidden hover:bg-warm-light"
+        >
           🎵 听首歌
-        </LargeButton>
-        <LargeButton variant="secondary" onClick={() => handleRecommend('story')} className="flex-1">
+        </button>
+        <button
+          type="button"
+          onClick={() => handleRecommend('story')}
+          className="flex-1 min-w-0 min-h-[48px] px-1 rounded-xl bg-white border-2 border-warm-primary text-warm-primary font-medium text-base whitespace-nowrap overflow-hidden hover:bg-warm-light"
+        >
           📖 听故事
-        </LargeButton>
-        <LargeButton variant="secondary" onClick={() => setCameraOpen(true)} className="flex-1">
+        </button>
+        <button
+          type="button"
+          onClick={() => setCameraOpen(true)}
+          className="flex-1 min-w-0 min-h-[48px] px-1 rounded-xl bg-white border-2 border-warm-primary text-warm-primary font-medium text-base whitespace-nowrap overflow-hidden hover:bg-warm-light"
+        >
           🎥 指挥小狗
-        </LargeButton>
+        </button>
       </div>
 
       {/* 视频动作面板：实时姿势识别 → 直接控制机器狗 */}
@@ -781,15 +793,15 @@ export default function ChatPage() {
         />
       )}
 
-      {/* 常用短语：老人打字不便，一点即发 */}
-      <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
+      {/* 常用短语：老人打字不便，一点即发；右侧渐隐提示可横滑（2026-11-04） */}
+      <div className="flex gap-2 mb-3 overflow-x-auto pb-1 [mask-image:linear-gradient(to_right,black_82%,transparent_99%)]">
         {QUICK_PHRASES.map((p) => (
           <button
             key={p}
             type="button"
             onClick={() => sendMessage(p)}
             disabled={sending}
-            className="flex-shrink-0 min-h-[48px] px-4 rounded-2xl bg-white border-2 border-warm-light hover:border-warm-primary text-gray-700 text-base disabled:opacity-50"
+            className="flex-shrink-0 min-h-[46px] px-4 rounded-2xl bg-white border-2 border-warm-light hover:border-warm-primary text-gray-700 text-base disabled:opacity-50"
           >
             {p}
           </button>

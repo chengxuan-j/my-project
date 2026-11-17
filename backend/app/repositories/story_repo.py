@@ -284,6 +284,13 @@ class ElicitationRepo:
         stmt = select(StoryElicitationQueue).where(StoryElicitationQueue.story_id == story_id)
         return list((await self.session.execute(stmt)).scalars().all())
 
+    async def delete_for_story(self, story_id: int) -> int:
+        """故事被老人主动永久删除时，连带清掉尚未提问的缺口队列。"""
+        rows = await self.for_story(story_id)
+        for row in rows:
+            await self.session.delete(row)
+        return len(rows)
+
     async def list_candidates(
         self, elderly_user_id: str, now: Optional[datetime] = None, limit: int = 20
     ) -> list[StoryElicitationQueue]:

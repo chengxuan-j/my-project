@@ -7,12 +7,14 @@ import {
   ApiError,
   memoirApi,
   CompilationItem,
+  MemoirStory,
   MemoirTimeline,
   StoryMediaItem,
 } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth';
 import { StoryTimeline } from '@/components/StoryTimeline';
 import { StoryPhotoUploader } from '@/components/StoryPhoto';
+import { StoryComposer } from '@/components/StoryComposer';
 
 /** 生成动画的最短展示时长：接口通常 2~4 秒就回来了，太快反而让人以为没做事。 */
 const MIN_RENDER_MS = 3000;
@@ -118,6 +120,15 @@ export function MemoirWorkbench({ embedded = false }: { embedded?: boolean }) {
     setProgress(100);
   };
 
+  /** 草稿箱里「用这段做短片」：只把这一段排成故事板，不掺别的回忆。 */
+  const handleUseStoryForFilm = async (story: MemoirStory) => {
+    const comp = await memoirApi.createCompilation({
+      title: story.title || '我的一段回忆',
+      story_ids: [story.id],
+    });
+    router.push(`/memoir/compilation/${comp.id}`);
+  };
+
   const handleCreateCompilation = async () => {
     setError('');
     setRendering(true);
@@ -175,6 +186,9 @@ export function MemoirWorkbench({ embedded = false }: { embedded?: boolean }) {
           {notice}
         </p>
       )}
+
+      {/* 讲故事 → 存下来 → 再决定做不做短片 */}
+      <StoryComposer onChanged={refresh} onUseForFilm={handleUseStoryForFilm} />
 
       {/* 做成短片：只在有已留档的故事时才亮 */}
       {!loading && (

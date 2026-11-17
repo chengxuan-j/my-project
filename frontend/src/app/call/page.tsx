@@ -148,8 +148,12 @@ export default function CallPage() {
       const el = pageRef.current;
       if (!el) return;
       const top = el.getBoundingClientRect().top;
-      // 根 layout 是 <main class="pb-8">，下面用 -mb-8 抵掉，这里只扣到视口底
-      const next = Math.max(window.innerHeight - top, 400);
+      // 根 layout 是 <main class="pb-8">，下面用 -mb-8 抵掉，这里只扣到视口底；
+      // 移动端再扣掉底部 TabBar 高度（--tab-h，2026-11-05）
+      const tabH = parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue('--tab-h') || '0'
+      );
+      const next = Math.max(window.innerHeight - top - (Number.isFinite(tabH) ? tabH : 0), 400);
       setAvailH((prev) => (prev === null || Math.abs(prev - next) > 1 ? next : prev));
     };
     measure();
@@ -350,6 +354,13 @@ export default function CallPage() {
     if (!auto) stopPlayback();
     stopVad();
     try {
+      // 安全上下文守卫：http://局域网IP 下 mediaDevices 为 undefined，
+      // 若不拦会抛 TypeError 被 catch 成"没权限"，误导用户去查权限。
+      if (typeof window !== 'undefined' && (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia)) {
+        setStage('idle');
+        setHint('当前是 HTTP 地址，浏览器禁用了麦克风。请用 http://localhost:3000 打开（不要用 IP 地址）。');
+        return;
+      }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       if (endedRef.current) {
         stream.getTracks().forEach((t) => t.stop());
@@ -573,7 +584,7 @@ export default function CallPage() {
       style={{
         background:
           'radial-gradient(120% 85% at 50% 0%, #3d2a1b 0%, #241a12 45%, #14100c 100%)',
-        height: availH ? `${availH}px` : 'calc(100vh - 76px)',
+        height: availH ? `${availH}px` : 'calc(100dvh - var(--nav-h, 72px) - var(--tab-h, 0px))',
       }}
     >
       <div className="max-w-3xl mx-auto px-4 py-4 h-full flex flex-col overflow-hidden">

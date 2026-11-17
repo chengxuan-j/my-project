@@ -4,6 +4,14 @@
 
 :root {
   --font-size-base: 18px;
+  /* 底部 TabBar 高度：桌面端无 tab=0，移动端固定占位（2026-11-05） */
+  --tab-h: 0px;
+}
+
+@media (max-width: 767px) {
+  :root {
+    --tab-h: 60px;
+  }
 }
 
 html {

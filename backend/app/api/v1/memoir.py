@@ -21,6 +21,7 @@ from app.db.base import get_db
 from app.db.models import Account, LifeStory
 from app.memoir import media_service
 from app.memoir.presenter import compilation_to_dict, media_to_dict, story_to_dict
+from app.memoir import story_chat
 from app.memoir.story_service import (
     attach_photo,
     build_timeline_payload,
@@ -28,13 +29,21 @@ from app.memoir.story_service import (
     detach_photo,
 )
 from app.repositories.profile_repo import FamilyRepo
-from app.repositories.story_repo import CompilationRepo, StoryMediaRepo, StoryRepo
+from app.repositories.story_repo import (
+    CompilationRepo,
+    ElicitationRepo,
+    StoryMediaRepo,
+    StoryRepo,
+)
 from app.schemas import (
     CompilationCreateRequest,
     CompilationItem,
     MemoirTimeline,
     StoryActionRequest,
+    StoryDraftNextRequest,
+    StoryDraftNextResponse,
     StoryItem,
+    StoryManualCreateRequest,
     StoryMediaItem,
 )
 
@@ -46,6 +55,18 @@ CONFIRMABLE = {"pending_confirm", "discarded"}
 # 允许被弃用的状态（老人对自己的回忆有最终处置权，含撤回已归档的）
 DISCARDABLE = {"draft", "pending_confirm", "archived"}
 
+# 短片界面手动保存的草稿在 raw_dialogue 里留的标记。
+# 聊天自动归档的回忆没有这个标记，因此不会出现在草稿箱列表里，也就不会被误删。
+MANUAL_STORY_ORIGIN = "short_film_draft"
+
+
+def _is_manual_story(story: LifeStory) -> bool:
+    """判断一条故事是不是短片界面自己保存的草稿。"""
+    for turn in (story.raw_dialogue or []):
+        if isinstance(turn, dict) and turn.get("origin") == MANUAL_STORY_ORIGIN:
+            return True
+    return False
+
 
 async def _load_owned(session: AsyncSession, story_id: int, elderly_user_id: str) -> LifeStory:
     """取故事并校验归属；越权与不存在同样返回 404（不泄露存在性）。"""
@@ -53,6 +74,141 @@ async def _load_owned(session: AsyncSession, story_id: int, elderly_user_id: str
     if story is None:
         raise HTTPException(status_code=404, detail="回忆条目不存在")
     return story
+
+
+@router.post("/memoir/stories", response_model=StoryItem)
+async def create_manual_story(
+    req: StoryManualCreateRequest,
+    account: Account = Depends(require_elderly),
+    session: AsyncSession = Depends(get_db),
+):
+    """把短片界面的文字或语音转写原文直接存进素材库。
+
+    这是用户明确的“保存”动作，所以直接 archived；默认 private，避免一段只为
+    做短片而保存的内容在未确认分享前出现在家属端。保存过程不调用 LLM，输入什么
+    就保存什么，保证演示链路确定、可重复。
+    """
+    content = req.content.strip()
+    if len(content) < 2:
+        raise HTTPException(status_code=422, detail="故事至少需要 2 个字")
+    # 标题取第一句（对话式保存时 content 是多行），截断带省略号，避免半句断在中间
+    first_line = next((ln.strip() for ln in content.splitlines() if ln.strip()), "")
+    title = req.title.strip() or (first_line[:20] + ("…" if len(first_line) > 20 else ""))
+
+    # 对话式讲故事：把老人原话和小忆的追问一起留底，回看能看清上下文。
+    # 沿用契约5 的口径——只追加，不改写；origin 只打在第一条上，供草稿箱识别。
+    turns = [
+        {"role": t.role, "content": t.content.strip()} for t in req.turns if t.content.strip()
+    ]
+    if turns:
+        raw_dialogue = turns
+        raw_dialogue[0]["origin"] = MANUAL_STORY_ORIGIN
+        raw_dialogue[0]["input_type"] = req.input_type
+    else:
+        raw_dialogue = [{
+            "role": "user",
+            "content": content,
+            # origin 用来把「短片界面自己存的草稿」和聊天里自动归档的回忆分开：
+            # 只有前者允许在短片界面里直接永久删除，避免误删聊天攒下的记忆。
+            "origin": MANUAL_STORY_ORIGIN,
+            "input_type": req.input_type,
+        }]
+
+    story = await StoryRepo(session).create(
+        account.user_id,
+        title=title,
+        summary=content,
+        raw_dialogue=raw_dialogue,
+        completeness=1.0,
+        status="archived",
+        visibility="private",
+    )
+    await session.commit()
+    logger.info(
+        "手动保存短片故事 user=%s story=%s input=%s chars=%d turns=%d",
+        account.user_id, story.id, req.input_type, len(content), len(raw_dialogue),
+    )
+    return story_to_dict(story)
+
+
+@router.post("/memoir/story-draft/next", response_model=StoryDraftNextResponse)
+async def story_draft_next(
+    req: StoryDraftNextRequest,
+    account: Account = Depends(require_elderly),
+):
+    """对话式讲故事：根据老人刚说的话，给出小忆的下一句。
+
+    无状态——前端把整段对话发上来，服务端只负责"下一句说什么"。
+    不设轮次上限、不自动收尾：老人愿意讲就一直陪着讲，随时可以保存。
+    模型不可用时有规则兜底，保证这句话一定接得上。
+    """
+    turns = [{"role": t.role, "content": t.content} for t in req.turns]
+    result = await story_chat.next_reply(turns)
+    logger.info(
+        "故事追问 user=%s turns=%d focus=%s source=%s",
+        account.user_id, len(turns), result.get("focus"), result.get("source"),
+    )
+    return StoryDraftNextResponse(**result)
+
+
+@router.get("/memoir/manual-stories", response_model=list[StoryItem])
+async def list_manual_stories(
+    account: Account = Depends(require_elderly),
+    session: AsyncSession = Depends(get_db),
+):
+    """短片界面「我存的故事」列表：只返回手动保存的草稿，按时间倒序。
+
+    不返回 speak_text：这段内容只用于做短片，不需要念给老人听。
+    """
+    stories = await StoryRepo(session).list_archived(account.user_id)
+    return [
+        story_to_dict(s, with_speech=False)
+        for s in stories
+        if _is_manual_story(s)
+    ]
+
+
+@router.delete("/memoir/stories/{story_id}")
+async def delete_story_permanently(
+    story_id: int,
+    account: Account = Depends(require_elderly),
+    session: AsyncSession = Depends(get_db),
+):
+    """永久删除老人自己的故事及其衍生内容。
+
+    短片稿的 prompt_package 里保存着故事原文快照，因此引用该故事的短片稿也必须
+    一起删除，否则“故事已删”只是表面删除。照片与追问队列同样清理；共享哈希的
+    照片只有确认没有其他记录引用后才删盘。
+    """
+    story = await _load_owned(session, story_id, account.user_id)
+    compilation_repo = CompilationRepo(session)
+    compilations = await compilation_repo.list_for_user(account.user_id, limit=5000)
+    related_compilations = [c for c in compilations if story_id in list(c.story_ids or [])]
+    for comp in related_compilations:
+        await compilation_repo.delete(comp.id, account.user_id)
+
+    await ElicitationRepo(session).delete_for_story(story_id)
+    media_repo = StoryMediaRepo(session)
+    media_rows = await media_repo.delete_for_story(story_id)
+    media_paths = {row.url for row in media_rows if row.url}
+    await session.delete(story)
+    await session.flush()
+    removable_paths = [
+        rel for rel in media_paths if not await media_repo.exists_url(rel)
+    ]
+    await session.commit()
+
+    for rel in removable_paths:
+        media_service.remove_photo(rel)
+    logger.info(
+        "永久删除短片故事 user=%s story=%s compilations=%d media=%d",
+        account.user_id, story_id, len(related_compilations), len(media_rows),
+    )
+    return {
+        "deleted": True,
+        "id": story_id,
+        "deleted_compilations": len(related_compilations),
+    }
 
 
 @router.get("/memoir/timeline", response_model=MemoirTimeline)

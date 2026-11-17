@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { profileApi, memoryApi, ApiError, Profile, MemoryItem } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth';
@@ -131,7 +132,15 @@ export default function ProfilePage() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
-      <h1 className="text-2xl font-bold text-warm-primary">👤 我的画像</h1>
+      <h1 className="text-2xl font-bold text-warm-primary">👤 我的</h1>
+
+      {/* 微信式收纳：低频功能入口集中到「我的」页（2026-11-05） */}
+      <section className="grid grid-cols-4 gap-2">
+        <QuickLink href="/letters" icon="💌" label="信笺" />
+        <QuickLink href="/journey" icon="🌊" label="人生河" />
+        <QuickLink href="/book" icon="📗" label="人生之书" />
+        <QuickLink href="/account" icon="⚙" label="账号" />
+      </section>
 
       {/* 我的档案（只读速览，chips 展示） */}
       <section className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl shadow-sm border-2 border-amber-200 p-6">
@@ -311,6 +320,19 @@ export default function ProfilePage() {
         <MemoryList memories={memories} onDelete={handleDeleteMemory} />
       </section>
     </div>
+  );
+}
+
+/** 「我的」页收纳入口：信笺 / 人生河 / 人生之书 / 账号 */
+function QuickLink({ href, icon, label }: { href: string; icon: string; label: string }) {
+  return (
+    <Link
+      href={href}
+      className="flex flex-col items-center justify-center gap-1 rounded-2xl bg-white border-2 border-warm-light py-3 min-h-[64px] hover:border-warm-primary transition-colors"
+    >
+      <span className="text-2xl leading-none">{icon}</span>
+      <span className="text-xs text-gray-700">{label}</span>
+    </Link>
   );
 }
 

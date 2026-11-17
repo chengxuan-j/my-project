@@ -999,6 +999,28 @@ export const memoirApi = {
   timeline: (status: 'archived' | 'all' = 'archived') =>
     api<MemoirTimeline>(`/memoir/timeline?status=${status}`),
 
+  /** 短片界面「我存的故事」：只列手动保存的草稿，不含聊天自动归档的回忆 */
+  manualStories: () => api<MemoirStory[]>('/memoir/manual-stories'),
+  /** 对话式讲故事：把小忆的下一句追问拿回来（服务端无状态，整段对话一起发） */
+  storyDraftNext: (turns: Array<{ role: 'user' | 'assistant'; content: string }>) =>
+    api<{ question: string; focus: string; done: boolean; source: string }>(
+      '/memoir/story-draft/next',
+      { method: 'POST', body: { turns } }
+    ),
+  /** 手动保存一段故事：文字输入或语音转写原文，原样入库、不经模型改写 */
+  createManualStory: (body: {
+    content: string;
+    title?: string;
+    input_type?: 'text' | 'voice';
+    turns?: Array<{ role: 'user' | 'assistant'; content: string }>;
+  }) => api<MemoirStory>('/memoir/stories', { method: 'POST', body }),
+  /** 永久删除自己保存的草稿（连带引用它的短片稿与照片） */
+  deleteStory: (storyId: number) =>
+    api<{ deleted: boolean; id: number; deleted_compilations: number }>(
+      `/memoir/stories/${storyId}`,
+      { method: 'DELETE' }
+    ),
+
   /** 已生成的短片故事板列表 */
   compilations: () => api<CompilationItem[]>('/memoir/compilations'),
   /** 把已留档的故事排成一条短片故事板（同步产包，2~4 秒） */

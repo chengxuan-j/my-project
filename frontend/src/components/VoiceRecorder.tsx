@@ -60,6 +60,12 @@ export function VoiceRecorder({ onRecognized, onError }: Props) {
 
   const startRecording = async () => {
     try {
+      // 安全上下文守卫：非 https/localhost 时浏览器不提供 mediaDevices，
+      // 直接调用会抛 TypeError 并被下面 catch 成"没权限"，把原因误导到权限上。
+      if (typeof window !== 'undefined' && (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia)) {
+        onError?.('当前是 HTTP 地址，浏览器禁用了麦克风。请用 http://localhost:3000 打开（不要用 IP 地址）');
+        return;
+      }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mr = new MediaRecorder(stream);
       chunksRef.current = [];

@@ -4,6 +4,9 @@ const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
 
 const nextConfig = {
   reactStrictMode: true,
+  // 构建输出目录，可用 NEXT_DIST_DIR 覆盖。默认 .next；
+  // 当 .next 被中断的构建写坏、又不方便删目录时，指向一个新目录即可绕过。
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   // 仅 Docker 构建（BUILD_STANDALONE=1）生成 standalone 产物；本地构建保持快速
   output: process.env.BUILD_STANDALONE === '1' ? 'standalone' : undefined,
   async rewrites() {
