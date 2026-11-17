@@ -17,6 +17,11 @@ alembic>=1.13
 langgraph>=1.0
 langchain-core>=1.0
 
+# 中文分词：记忆图谱抽人物/话题、BM25 检索切词
+# 纯 Python，无二进制依赖。缺失时相关模块会退化运行（见 bm25.py / memory_insights.py），
+# 但图谱会变空、检索精度下降，正常部署请装。
+jieba>=0.42.1
+
 # 鉴权
 passlib[bcrypt]>=1.7
 python-jose[cryptography]>=3.3

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { authApi, ApiError } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth';
 import { LargeButton } from '@/components/LargeButton';
+import { Eye, EyeOff, Flower2, MessageCircle, Mic, ShieldCheck } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -94,37 +95,84 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-64px)] flex items-center justify-center px-4 py-8">
-      <div className="w-full max-w-md bg-white rounded-3xl shadow-lg p-8 border-2 border-warm-light">
-        <h1 className="text-3xl font-bold text-center text-warm-primary mb-2">
-          🌻 欢迎回来
-        </h1>
-        <p className="text-center text-gray-600 mb-6">登录老人情感陪伴 AI</p>
+    <div className="app-min-screen grid lg:grid-cols-[1.05fr_1fr]">
+      {/* ---------- 桌面品牌区 ---------- */}
+      <aside className="relative hidden lg:flex flex-col justify-between overflow-hidden bg-primary p-12 text-on-primary">
+        <div
+          aria-hidden
+          className="absolute -top-24 -right-24 h-72 w-72 rounded-pill bg-white/10"
+        />
+        <div
+          aria-hidden
+          className="absolute bottom-16 -left-16 h-56 w-56 rounded-pill bg-white/10"
+        />
 
-        <div className="grid grid-cols-2 bg-amber-50 rounded-xl p-1 mb-6" role="tablist" aria-label="登录方式">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mode === 'password'}
-            onClick={() => { setMode('password'); setError(''); setNotice(''); }}
-            className={`min-h-[48px] rounded-lg font-semibold ${mode === 'password' ? 'bg-white text-warm-primary shadow-sm' : 'text-gray-600'}`}
-          >
-            密码登录
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mode === 'email'}
-            onClick={() => { setMode('email'); setError(''); setNotice(''); }}
-            className={`min-h-[48px] rounded-lg font-semibold ${mode === 'email' ? 'bg-white text-warm-primary shadow-sm' : 'text-gray-600'}`}
-          >
-            邮箱验证码
-          </button>
+        <div className="relative flex items-center gap-2.5 text-xl font-bold">
+          <Flower2 aria-hidden className="h-7 w-7" />
+          陪伴 AI
         </div>
+
+        <div className="relative">
+          <h2 className="font-display text-4xl font-bold leading-snug">
+            温暖的陪伴，
+            <br />
+            随时光与记忆同行
+          </h2>
+          <ul className="mt-8 space-y-4 text-base/relaxed text-on-primary/85">
+            <li className="flex items-center gap-3">
+              <MessageCircle aria-hidden className="h-5 w-5 shrink-0" />
+              听得懂情绪的聊天陪伴，越聊越懂你
+            </li>
+            <li className="flex items-center gap-3">
+              <Mic aria-hidden className="h-5 w-5 shrink-0" />
+              按住说话就行，方言也能聊
+            </li>
+            <li className="flex items-center gap-3">
+              <ShieldCheck aria-hidden className="h-5 w-5 shrink-0" />
+              家人可远程关注，安心又放心
+            </li>
+          </ul>
+        </div>
+
+        <p className="relative text-sm text-on-primary/60">老人情感陪伴 AI · Demo</p>
+      </aside>
+
+      {/* ---------- 表单区 ---------- */}
+      <main className="flex items-center justify-center px-4 py-8">
+        <div className="w-full max-w-md">
+          {/* 手机端品牌头 */}
+          <div className="mb-6 flex items-center justify-center gap-2 text-primary lg:hidden">
+            <Flower2 aria-hidden className="h-7 w-7" />
+            <span className="text-xl font-bold">陪伴 AI</span>
+          </div>
+
+          <h1 className="text-3xl font-bold text-ink mb-1.5">欢迎回来</h1>
+          <p className="text-muted mb-6">登录老人情感陪伴 AI</p>
+
+          <div className="grid grid-cols-2 bg-primary-soft rounded-btn p-1 mb-6" role="tablist" aria-label="登录方式">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === 'password'}
+              onClick={() => { setMode('password'); setError(''); setNotice(''); }}
+              className={`min-h-[48px] rounded-btn font-semibold ${mode === 'password' ? 'bg-card text-primary shadow-card' : 'text-muted'}`}
+            >
+              密码登录
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === 'email'}
+              onClick={() => { setMode('email'); setError(''); setNotice(''); }}
+              className={`min-h-[48px] rounded-btn font-semibold ${mode === 'email' ? 'bg-card text-primary shadow-card' : 'text-muted'}`}
+            >
+              邮箱验证码
+            </button>
+          </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
           {mode === 'password' ? <><div>
-            <label htmlFor="username" className="block mb-2 font-medium text-gray-700">
+            <label htmlFor="username" className="block mb-2 font-medium text-ink">
               用户名
             </label>
             <input
@@ -132,13 +180,13 @@ export default function LoginPage() {
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full min-h-[56px] px-4 rounded-xl border-2 border-warm-light focus:border-warm-primary outline-none text-lg"
+              className="w-full min-h-[56px] px-4 rounded-input border border-hairline focus:border-primary outline-none text-lg"
               placeholder="请输入用户名"
               autoComplete="username"
             />
           </div>
           <div>
-            <label htmlFor="password" className="block mb-2 font-medium text-gray-700">
+            <label htmlFor="password" className="block mb-2 font-medium text-ink">
               密码
             </label>
             <div className="relative">
@@ -147,7 +195,7 @@ export default function LoginPage() {
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full min-h-[56px] pl-4 pr-16 rounded-xl border-2 border-warm-light focus:border-warm-primary outline-none text-lg"
+                className="w-full min-h-[56px] pl-4 pr-16 rounded-input border border-hairline focus:border-primary outline-none text-lg"
                 placeholder="请输入密码"
                 autoComplete="current-password"
               />
@@ -157,14 +205,14 @@ export default function LoginPage() {
                 aria-label={showPassword ? '隐藏密码' : '显示密码'}
                 aria-pressed={showPassword}
                 title={showPassword ? '隐藏密码' : '显示密码'}
-                className="absolute right-2 top-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center rounded-lg text-xl text-gray-600 hover:bg-warm-light focus:outline-none focus:ring-2 focus:ring-warm-primary"
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-12 h-12 flex items-center justify-center rounded-btn text-muted hover:bg-primary-soft focus:outline-none focus:ring-2 focus:ring-[color:var(--ring)]"
               >
-                {showPassword ? '🙈' : '👁'}
+                {showPassword ? <EyeOff aria-hidden className="h-6 w-6" /> : <Eye aria-hidden className="h-6 w-6" />}
               </button>
             </div>
           </div></> : <>
           <div>
-            <label htmlFor="login-email" className="block mb-2 font-medium text-gray-700">
+            <label htmlFor="login-email" className="block mb-2 font-medium text-ink">
               邮箱
             </label>
             <input
@@ -172,13 +220,13 @@ export default function LoginPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full min-h-[56px] px-4 rounded-xl border-2 border-warm-light focus:border-warm-primary outline-none text-lg"
+              className="w-full min-h-[56px] px-4 rounded-input border border-hairline focus:border-primary outline-none text-lg"
               placeholder="name@example.com"
               autoComplete="email"
             />
           </div>
           <div>
-            <label htmlFor="email-code" className="block mb-2 font-medium text-gray-700">
+            <label htmlFor="email-code" className="block mb-2 font-medium text-ink">
               验证码
             </label>
             <div className="grid grid-cols-[1fr_auto] gap-2">
@@ -188,7 +236,7 @@ export default function LoginPage() {
                 inputMode="numeric"
                 value={code}
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                className="min-w-0 min-h-[56px] px-4 rounded-xl border-2 border-warm-light focus:border-warm-primary outline-none text-lg tracking-widest"
+                className="min-w-0 min-h-[56px] px-4 rounded-input border border-hairline focus:border-primary outline-none text-lg tracking-widest"
                 placeholder="6 位验证码"
                 autoComplete="one-time-code"
               />
@@ -196,7 +244,7 @@ export default function LoginPage() {
                 type="button"
                 onClick={handleSendCode}
                 disabled={sendingCode || cooldown > 0}
-                className="min-w-[120px] min-h-[56px] px-4 rounded-xl border-2 border-warm-primary text-warm-primary font-semibold hover:bg-warm-light disabled:opacity-50 disabled:cursor-not-allowed"
+                className="min-w-[120px] min-h-[56px] px-4 rounded-btn border border-primary text-primary font-semibold hover:bg-primary-soft disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {sendingCode ? '发送中…' : cooldown > 0 ? `${cooldown} 秒` : '获取验证码'}
               </button>
@@ -205,13 +253,13 @@ export default function LoginPage() {
           </>}
 
           {notice && (
-            <div className="bg-green-50 border-2 border-green-200 text-green-700 rounded-xl px-4 py-3">
+            <div className="bg-success-soft text-success rounded-btn px-4 py-3">
               {notice}
             </div>
           )}
 
           {error && (
-            <div className="bg-red-50 border-2 border-red-300 text-red-700 rounded-xl px-4 py-3">
+            <div className="bg-danger-soft text-danger rounded-btn px-4 py-3">
               {error}
             </div>
           )}
@@ -221,13 +269,14 @@ export default function LoginPage() {
           </LargeButton>
         </form>
 
-        <p className="text-center mt-6 text-gray-600">
+        <p className="text-center mt-6 text-muted">
           还没有账号？{' '}
-          <Link href="/register" className="text-warm-primary font-bold underline">
+          <Link href="/register" className="text-primary font-bold underline">
             立即注册
           </Link>
         </p>
-      </div>
+        </div>
+      </main>
     </div>
   );
 }

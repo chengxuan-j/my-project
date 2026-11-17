@@ -228,7 +228,7 @@ export function LetterArrivalModal() {
             </button>
             <button
               onClick={snooze}
-              className="min-h-[56px] px-5 rounded-full border border-amber-200/40 text-amber-100/80 hover:bg-white/10"
+              className="min-h-[56px] px-5 rounded-full border border-white/20 text-amber-100/80 hover:bg-white/10"
             >
               稍后再看
             </button>
@@ -237,7 +237,7 @@ export function LetterArrivalModal() {
         </div>
       ) : (
         <article className="lt-paper relative z-10">
-          <div className="lt-line flex items-center justify-between text-xs text-amber-800/60"
+          <div className="lt-line flex items-center justify-between text-xs text-amber-200/60"
                style={{ animationDelay: '0.15s' }}>
             <span>{formatDate(letter.deliver_at)}</span>
             <span>{letter.recipient_type === 'family' ? `写给 ${letter.recipient_name}` : '写给未来的自己'}</span>
@@ -254,7 +254,7 @@ export function LetterArrivalModal() {
               </p>
             ))}
           </div>
-          <div className="lt-line mt-8 flex items-center justify-between text-sm text-amber-800/60"
+          <div className="lt-line mt-8 flex items-center justify-between text-sm text-amber-200/60"
                style={{ animationDelay: `${0.9 + content.split(/\n+/).length * 0.22}s` }}>
             <span>时间替你保管到今天</span>
             <button

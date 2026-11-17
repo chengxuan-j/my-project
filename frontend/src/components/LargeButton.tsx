@@ -8,10 +8,11 @@ interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const VARIANT_CLS: Record<NonNullable<Props['variant']>, string> = {
-  primary: 'bg-warm-primary hover:bg-warm-dark text-white',
-  secondary: 'bg-white hover:bg-warm-light text-warm-primary border-2 border-warm-primary',
-  danger: 'bg-red-500 hover:bg-red-600 text-white',
-  ghost: 'bg-transparent hover:bg-warm-light text-gray-700',
+  primary: 'bg-primary hover:bg-primary-strong text-on-primary shadow-btn',
+  secondary:
+    'bg-card hover:bg-primary-soft text-primary border border-hairline-strong',
+  danger: 'bg-danger hover:bg-danger/90 text-on-primary',
+  ghost: 'bg-transparent hover:bg-primary-soft text-muted',
 };
 
 const SIZE_CLS: Record<NonNullable<Props['size']>, string> = {
@@ -25,7 +26,7 @@ export const LargeButton = forwardRef<HTMLButtonElement, Props>(
     return (
       <button
         ref={ref}
-        className={`rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${VARIANT_CLS[variant]} ${SIZE_CLS[size]} ${className}`}
+        className={`rounded-btn inline-flex items-center justify-center gap-1.5 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${VARIANT_CLS[variant]} ${SIZE_CLS[size]} ${className}`}
         {...rest}
       />
     );

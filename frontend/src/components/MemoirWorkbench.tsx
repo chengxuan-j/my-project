@@ -159,13 +159,13 @@ export function MemoirWorkbench({ embedded = false }: { embedded?: boolean }) {
     <div className={embedded ? "" : "max-w-5xl mx-auto px-4 py-6"}>
       <div className="flex items-baseline justify-between flex-wrap gap-3 mb-4">
         <div>
-          {!embedded && <h1 className="text-2xl font-bold text-gray-900">📖 我的回忆录</h1>}
-          <p className="text-sm text-gray-500 mt-1">
+          {!embedded && <h1 className="text-2xl font-bold text-ink">📖 我的回忆录</h1>}
+          <p className="text-sm text-muted mt-1">
             这里是<strong>素材库</strong>：讲过的故事、照片和短片稿。
             确认留档后，故事才会进入《人生之书》。
           </p>
         </div>
-        <label className="flex items-center gap-2 text-base text-gray-700 min-h-[48px]">
+        <label className="flex items-center gap-2 text-base text-ink min-h-[48px]">
           <input
             type="checkbox"
             checked={onlyArchived}
@@ -177,12 +177,12 @@ export function MemoirWorkbench({ embedded = false }: { embedded?: boolean }) {
       </div>
 
       {error && (
-        <p className="mb-4 rounded-xl bg-red-50 border border-red-200 text-red-700 p-4">
+        <p className="mb-4 rounded-btn bg-danger-soft border border-hairline text-danger p-4">
           {error}
         </p>
       )}
       {notice && (
-        <p className="mb-4 rounded-xl bg-green-50 border border-green-200 text-green-700 p-4">
+        <p className="mb-4 rounded-btn bg-success-soft border border-hairline text-success p-4">
           {notice}
         </p>
       )}
@@ -192,30 +192,30 @@ export function MemoirWorkbench({ embedded = false }: { embedded?: boolean }) {
 
       {/* 做成短片：只在有已留档的故事时才亮 */}
       {!loading && (
-        <section className="mb-6 rounded-2xl border border-amber-200 bg-white p-4 hc-invert">
+        <section className="mb-6 rounded-card border border-hairline bg-card p-4 hc-invert">
           {rendering ? (
             <div>
-              <p className="text-lg text-gray-800">正在把您讲的这些排成短片……</p>
-              <div className="mt-3 h-4 rounded-full bg-warm-light overflow-hidden">
+              <p className="text-lg text-ink">正在把您讲的这些排成短片……</p>
+              <div className="mt-3 h-4 rounded-full bg-primary-soft overflow-hidden">
                 <div
-                  className="h-full bg-warm-primary transition-all duration-200"
+                  className="h-full bg-primary transition-all duration-200"
                   style={{ width: `${progress}%` }}
                 />
               </div>
-              <p className="mt-2 text-sm text-gray-500">差不多十几秒，您稍等。</p>
+              <p className="mt-2 text-sm text-muted">差不多十几秒，您稍等。</p>
             </div>
           ) : (
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
-                <p className="text-lg font-bold text-gray-800">把回忆做成一段短片</p>
-                <p className="text-gray-500">
+                <p className="text-lg font-bold text-ink">把回忆做成一段短片</p>
+                <p className="text-muted">
                   只出文字稿和画面提示词，不会生成视频。已留档 {total} 段。
                 </p>
               </div>
               <button
                 onClick={handleCreateCompilation}
                 disabled={total === 0}
-                className="min-h-[56px] px-6 rounded-xl bg-warm-primary hover:bg-warm-dark text-white text-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                className="min-h-[56px] px-6 rounded-btn bg-primary hover:bg-primary-strong text-white text-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 🎬 做成短片
               </button>
@@ -226,13 +226,13 @@ export function MemoirWorkbench({ embedded = false }: { embedded?: boolean }) {
 
       {compilations.length > 0 && (
         <section className="mb-6">
-          <h2 className="text-lg font-bold text-gray-800 mb-2">做过的短片稿</h2>
+          <h2 className="text-lg font-bold text-ink mb-2">做过的短片稿</h2>
           <ul className="flex flex-wrap gap-2">
             {compilations.map((c) => (
               <li key={c.id}>
                 <Link
                   href={`/memoir/compilation/${c.id}`}
-                  className="inline-flex items-center min-h-[48px] px-4 rounded-xl bg-warm-light text-warm-dark hover:bg-warm-primary hover:text-white"
+                  className="inline-flex items-center min-h-[48px] px-4 rounded-btn bg-primary-soft text-primary hover:bg-primary hover:text-white"
                 >
                   {c.title || '未命名'} ·{' '}
                   {c.prompt_package?.total_seconds ?? 0} 秒
@@ -244,7 +244,7 @@ export function MemoirWorkbench({ embedded = false }: { embedded?: boolean }) {
       )}
 
       {loading ? (
-        <p className="text-gray-500 text-lg">正在翻您的老照片……</p>
+        <p className="text-muted text-lg">正在翻您的老照片……</p>
       ) : timeline ? (
         <StoryTimeline
           timeline={timeline}
@@ -261,7 +261,7 @@ export function MemoirWorkbench({ embedded = false }: { embedded?: boolean }) {
               <button
                 type="button"
                 onClick={() => setUploadFor(story.id)}
-                className="mt-3 min-h-[48px] px-4 rounded-xl bg-white border-2 border-warm-light text-gray-700 hover:border-warm-primary"
+                className="mt-3 min-h-[48px] px-4 rounded-btn bg-card border border-hairline text-ink hover:border-primary"
               >
                 📷 加一张照片
               </button>

@@ -108,26 +108,26 @@ export function FamilyMemoirPanel({
   const active = compilations.find((c) => c.id === activeComp) || null;
 
   if (loading) {
-    return <p className="text-gray-500 text-lg">正在看看老人留下的回忆……</p>;
+    return <p className="text-muted text-lg">正在看看老人留下的回忆……</p>;
   }
 
   return (
     <section className="space-y-5">
-      <div className="rounded-2xl bg-warm-bg border-2 border-amber-200 p-4">
-        <h2 className="text-xl font-bold text-gray-900">
+      <div className="rounded-card bg-canvas border border-hairline p-4">
+        <h2 className="text-xl font-bold text-ink">
           📖 {elderlyName} 的回忆录
         </h2>
-        <p className="text-gray-600 mt-1 leading-relaxed">
+        <p className="text-muted mt-1 leading-relaxed">
           这里只显示老人**愿意分享**的回忆。老人不想给别人看的，不会出现在这儿——
           也请您别催他多讲。
         </p>
       </div>
 
       {error && (
-        <p className="rounded-xl bg-red-50 border border-red-200 text-red-700 p-4">{error}</p>
+        <p className="rounded-btn bg-danger-soft border border-hairline text-danger p-4">{error}</p>
       )}
       {toast && (
-        <p className="rounded-xl bg-green-50 border border-green-200 text-green-700 p-4">
+        <p className="rounded-btn bg-success-soft border border-hairline text-success p-4">
           {toast}
         </p>
       )}
@@ -148,7 +148,7 @@ export function FamilyMemoirPanel({
                 <button
                   type="button"
                   onClick={() => setUploadFor(story.id)}
-                  className="min-h-[44px] px-4 rounded-xl bg-white border-2 border-warm-light text-gray-700 hover:border-warm-primary"
+                  className="min-h-[44px] px-4 rounded-btn bg-card border border-hairline text-ink hover:border-primary"
                 >
                   📷 给这段补一张照片
                 </button>
@@ -159,11 +159,11 @@ export function FamilyMemoirPanel({
       )}
 
       {familyPhotos.length > 0 && (
-        <section className="rounded-2xl border-2 border-warm-light bg-white p-5">
-          <h3 className="text-lg font-bold text-gray-800">
+        <section className="rounded-card border border-hairline bg-card p-5">
+          <h3 className="text-lg font-bold text-ink">
             🖼️ 家人补的照片（{familyPhotos.length}）
           </h3>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-muted mt-1">
             这些是您和家人补上去的，老人打开回忆录就能看到。点右上角 × 可以撤回。
           </p>
           <StoryPhotoStrip media={familyPhotos} onDelete={handleDelete} onOpen={setPreview} />
@@ -171,10 +171,10 @@ export function FamilyMemoirPanel({
       )}
 
       {compilations.length > 0 && (
-        <section className="rounded-2xl border-2 border-warm-light bg-white p-5 space-y-4">
+        <section className="rounded-card border border-hairline bg-card p-5 space-y-4">
           <div>
-            <h3 className="text-lg font-bold text-gray-800">🎬 老人的短片故事板</h3>
-            <p className="text-sm text-gray-500 mt-1">
+            <h3 className="text-lg font-bold text-ink">🎬 老人的短片故事板</h3>
+            <p className="text-sm text-muted mt-1">
               老人把几段回忆排成了一条短片。这里给的是旁白和画面提示词，
               您可以复制到常用的视频工具里自己做成片子——本系统不替您生成画面。
             </p>
@@ -186,10 +186,10 @@ export function FamilyMemoirPanel({
                 key={c.id}
                 type="button"
                 onClick={() => setActiveComp(activeComp === c.id ? null : c.id)}
-                className={`min-h-[44px] px-4 rounded-xl border-2 text-base ${
+                className={`min-h-[44px] px-4 rounded-btn border text-base ${
                   activeComp === c.id
-                    ? 'bg-warm-primary text-white border-warm-primary'
-                    : 'bg-white text-gray-700 border-warm-light'
+                    ? 'bg-primary text-white border-primary'
+                    : 'bg-card text-ink border-hairline'
                 }`}
               >
                 {c.title || '一段日子'} · {c.prompt_package?.scenes.length ?? 0} 段
@@ -203,7 +203,7 @@ export function FamilyMemoirPanel({
               <div className="flex justify-end">
                 <PromptCopyButton compilation={active} />
               </div>
-              <hr className="border-amber-200" />
+              <hr className="border-hairline" />
               <StoryboardSceneList compilation={active} />
             </>
           )}
@@ -225,7 +225,7 @@ export function FamilyMemoirPanel({
               <button
                 type="button"
                 onClick={() => setPreview(null)}
-                className="min-h-[44px] px-4 rounded-xl bg-white text-gray-800"
+                className="min-h-[44px] px-4 rounded-btn bg-card text-ink"
               >
                 关闭
               </button>

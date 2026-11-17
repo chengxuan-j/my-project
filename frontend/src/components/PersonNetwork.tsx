@@ -29,9 +29,9 @@ export function PersonNetwork({ persons, centerLabel, selected, onSelect }: Prop
   });
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border-2 border-warm-light p-4">
-      <h3 className="text-lg font-bold text-gray-900 mb-1">🕸 人物关系网络</h3>
-      <p className="text-sm text-gray-500 mb-2">点一点人物，看看 AI 记住的关于他/她的事</p>
+    <div className="bg-card rounded-card shadow-card border border-hairline p-4">
+      <h3 className="text-lg font-bold text-ink mb-1">🕸 人物关系网络</h3>
+      <p className="text-sm text-muted mb-2">点一点人物，看看 AI 记住的关于他/她的事</p>
 
       <svg viewBox={`0 0 ${size} ${size}`} className="w-full max-w-[360px] mx-auto">
         {nodes.map((n) => (
@@ -96,10 +96,10 @@ export function PersonNetwork({ persons, centerLabel, selected, onSelect }: Prop
             key={n.key}
             type="button"
             onClick={() => onSelect?.(n)}
-            className={`px-3 py-1 rounded-lg text-sm border-2 ${
+            className={`px-3 py-1 rounded-lg text-sm border ${
               selected === n.key
-                ? 'bg-warm-primary text-white border-warm-primary'
-                : 'bg-warm-light text-gray-700 border-warm-light'
+                ? 'bg-primary text-on-primary border-primary'
+                : 'bg-primary-soft text-ink border-hairline'
             }`}
           >
             {n.label}（{n.memories.length}）

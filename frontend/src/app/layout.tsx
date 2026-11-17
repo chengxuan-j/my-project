@@ -2,10 +2,8 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { SettingsProvider } from '@/components/SettingsProvider';
 import { NavBar } from '@/components/NavBar';
-import { NavHeightSync } from '@/components/NavHeightSync';
 import { CareAlertModal } from '@/components/CareAlertModal';
 import { LetterArrivalModal } from '@/components/LetterArrivalModal';
-import { BottomTabBar } from '@/components/BottomTabBar';
 
 // 全站为客户端交互应用（登录态存 localStorage），
 // 禁止静态预渲染被长期缓存，避免发版后客户端仍加载旧页面/旧 chunk。
@@ -21,7 +19,10 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 5,
-  themeColor: '#F59E0B',
+  // 会被 SettingsProvider 按当前主题动态改写；这里是默认主题（粉彩）的顶栏色
+  themeColor: '#fffdf9',
+  // 让页面铺到 iPhone 刘海/底部横条下面，再由 safe-area 变量补内边距
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({
@@ -31,17 +32,23 @@ export default function RootLayout({
 }) {
   return (
     <html lang="zh-CN">
-      <body className="min-h-screen bg-warm-bg">
-        {/* 放在最前：先摘掉历史遗留的 Service Worker 与其缓存，再渲染应用 */}
+      <head>
+        {/* 首帧前恢复主题/字号偏好，避免刷新时先闪默认样式（zustand persist 存储格式） */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var raw=localStorage.getItem('settings-storage');if(!raw)return;var s=JSON.parse(raw).state||{};var r=document.documentElement;['pastel','soft','warm'].forEach(function(t){r.classList.remove('theme-'+t)});r.classList.add('theme-'+(s.theme==='soft'||s.theme==='warm'?s.theme:'pastel'));r.classList.remove('font-normal','font-large','font-xlarge');r.classList.add('font-'+(s.fontSize||'normal'));if(s.highContrast)r.classList.add('high-contrast');}catch(e){}})();`,
+          }}
+        />
+      </head>
+      <body className="bg-canvas">
+        {/* 放在最前：先摘掉历史遗留的 Service Worker 与其缓存，再渲染应用（本地事故修复，勿删） */}
         <ServiceWorkerCleanup />
         <SettingsProvider>
           <NavBar />
-          <NavHeightSync />
           <CareAlertModal />
           <LetterArrivalModal />
-          {/* 移动端底部 tab 占位留白（桌面端无 tab，保持原 pb-8） */}
-          <main className="pb-24 md:pb-8">{children}</main>
-          <BottomTabBar />
+          {/* app-main 由远程 design system 提供底部 TabBar 留白；NavBar 已内置 TabBar 与高度同步 */}
+          <main className="app-main">{children}</main>
         </SettingsProvider>
       </body>
     </html>

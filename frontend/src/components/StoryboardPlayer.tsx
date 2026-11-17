@@ -3,24 +3,24 @@
 import { useEffect, useRef, useState } from 'react';
 import { CompilationItem, speechApi } from '@/lib/api';
 
-/** 一段镜头的占位色块：按情绪基调给颜色，代替画面（契约6：不生成画面）。 */
-const TONE_GRADIENTS: Record<string, string> = {
-  温暖: 'from-amber-200 to-orange-300',
-  自豪: 'from-yellow-200 to-amber-300',
-  辛酸: 'from-slate-300 to-slate-500',
-  平淡: 'from-stone-200 to-stone-400',
-  创伤: 'from-slate-500 to-slate-700',
-  怀念: 'from-rose-200 to-amber-200',
+/** 一段镜头的占位色块：按情绪基调给色调，代替画面（契约6：不生成画面）。 */
+const TONE_TINTS: Record<string, string> = {
+  温暖: 'bg-butter',
+  自豪: 'bg-warning-soft',
+  辛酸: 'bg-lilac-soft',
+  平淡: 'bg-card-soft',
+  创伤: 'bg-primary-soft',
+  怀念: 'bg-accent-soft',
 };
 
 function Placeholder({ tone, label }: { tone: string; label: string }) {
-  const grad = TONE_GRADIENTS[tone] || TONE_GRADIENTS['平淡'];
+  const tint = TONE_TINTS[tone] || TONE_TINTS['平淡'];
   return (
     <div
-      className={`w-full aspect-video rounded-2xl bg-gradient-to-br ${grad} flex flex-col items-center justify-center text-white text-center p-6`}
+      className={`w-full aspect-video rounded-card ${tint} flex flex-col items-center justify-center text-ink text-center p-6`}
     >
-      <span className="text-lg font-bold drop-shadow">{label}</span>
-      <span className="text-sm opacity-90 mt-2 drop-shadow">
+      <span className="text-lg font-bold">{label}</span>
+      <span className="text-sm opacity-80 mt-2">
         （画面示意占位，系统不生成影像）
       </span>
     </div>
@@ -84,7 +84,7 @@ export function StoryboardPlayer({ compilation }: { compilation: CompilationItem
 
   if (!pkg || scenes.length === 0) {
     return (
-      <div className="rounded-2xl border border-amber-200 bg-white p-6 text-gray-600 hc-invert">
+      <div className="rounded-card border border-hairline bg-card p-6 text-muted hc-invert">
         这段短片还没有可用的故事板。
       </div>
     );
@@ -97,14 +97,14 @@ export function StoryboardPlayer({ compilation }: { compilation: CompilationItem
       <audio ref={audioRef} onEnded={handleEnded} className="hidden" />
 
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h2 className="text-xl font-bold text-gray-900">{pkg.title}</h2>
+        <h2 className="text-xl font-bold text-ink">{pkg.title}</h2>
         <div className="flex items-center gap-3">
-          <span className="text-gray-500">
+          <span className="text-muted">
             共 {scenes.length} 段 · 约 {pkg.total_seconds} 秒
           </span>
           <button
             onClick={() => setPlaying((v) => !v)}
-            className="min-h-[48px] px-5 rounded-xl bg-warm-primary hover:bg-warm-dark text-white font-bold"
+            className="min-h-[48px] px-5 rounded-btn bg-primary hover:bg-primary-strong text-on-primary font-bold"
           >
             {playing ? '⏸ 暂停' : '▶ 播放'}
           </button>
@@ -116,37 +116,37 @@ export function StoryboardPlayer({ compilation }: { compilation: CompilationItem
         label={`第 ${current.index} 段｜${current.display_time || current.era || '时间不详'}｜${current.duration_seconds} 秒`}
       />
 
-      <div className="rounded-2xl border border-amber-200 bg-white p-5 hc-invert">
+      <div className="rounded-card border border-hairline bg-card p-5 hc-invert">
         <div className="flex items-center gap-3 flex-wrap mb-2">
-          <h3 className="text-lg font-bold text-gray-800">{current.title || '一段往事'}</h3>
+          <h3 className="text-lg font-bold text-ink">{current.title || '一段往事'}</h3>
           {current.era && (
-            <span className="text-sm bg-warm-light text-warm-dark rounded-lg px-2 py-0.5">
+            <span className="text-sm bg-primary-soft text-primary rounded-lg px-2 py-0.5">
               {current.era}
             </span>
           )}
           {current.narration_source === 'original' && (
-            <span className="text-sm border border-amber-300 text-warm-dark rounded-lg px-2 py-0.5">
+            <span className="text-sm border border-hairline text-primary rounded-lg px-2 py-0.5">
               旁白是老人原话
             </span>
           )}
         </div>
-        <p className="text-xl leading-relaxed text-gray-800">{current.narration}</p>
+        <p className="text-xl leading-relaxed text-ink">{current.narration}</p>
 
         <details className="mt-3">
-          <summary className="cursor-pointer text-gray-500 min-h-[40px] flex items-center">
+          <summary className="cursor-pointer text-muted min-h-[40px] flex items-center">
             看这段的画面提示词
           </summary>
-          <p className="mt-2 text-base text-gray-600 bg-warm-bg rounded-xl p-3">
+          <p className="mt-2 text-base text-muted bg-canvas rounded-btn p-3">
             {current.visual_prompt}
           </p>
-          <p className="mt-2 text-sm text-gray-500">
+          <p className="mt-2 text-sm text-muted">
             出处（老人原话）：{current.source_evidence}
           </p>
         </details>
       </div>
 
       {pkg.disclaimer && (
-        <p className="text-sm text-gray-500 leading-relaxed">{pkg.disclaimer}</p>
+        <p className="text-sm text-muted leading-relaxed">{pkg.disclaimer}</p>
       )}
     </div>
   );
@@ -196,7 +196,7 @@ export function PromptCopyButton({ compilation }: { compilation: CompilationItem
     <button
       type="button"
       onClick={handleCopy}
-      className="min-h-[48px] px-4 rounded-xl bg-white border-2 border-warm-primary text-warm-primary font-medium hover:bg-warm-light"
+      className="min-h-[48px] px-4 rounded-btn bg-card border border-primary text-primary font-medium hover:bg-primary-soft"
     >
       {copied ? '✅ 已复制' : '📋 复制全部提示词'}
     </button>
@@ -209,27 +209,27 @@ export function StoryboardSceneList({ compilation }: { compilation: CompilationI
   if (!pkg) return null;
   return (
     <section className="space-y-3">
-      <h3 className="text-lg font-bold text-gray-800">故事板</h3>
+      <h3 className="text-lg font-bold text-ink">故事板</h3>
       <ol className="space-y-3">
         {pkg.scenes.map((s) => (
-          <li key={s.index} className="rounded-2xl border border-amber-200 bg-white p-4 hc-invert">
+          <li key={s.index} className="rounded-card border border-hairline bg-card p-4 hc-invert">
             <div className="flex items-baseline justify-between flex-wrap gap-2">
-              <strong className="text-gray-800">
+              <strong className="text-ink">
                 {s.index}. {s.title || '一段往事'}
               </strong>
-              <span className="text-sm text-gray-500">
+              <span className="text-sm text-muted">
                 {s.display_time || '时间不详'} · {s.duration_seconds} 秒
                 {s.narration_source === 'original' && ' · 原话'}
               </span>
             </div>
-            <p className="mt-2 text-lg text-gray-800">{s.narration}</p>
-            <p className="mt-2 text-base text-gray-600">{s.visual_prompt}</p>
+            <p className="mt-2 text-lg text-ink">{s.narration}</p>
+            <p className="mt-2 text-base text-muted">{s.visual_prompt}</p>
           </li>
         ))}
       </ol>
 
       {pkg.llm_used === false && (
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-muted">
           这次是离线整理的（没能连上模型），旁白直接用老人原话，画面提示为占位。
         </p>
       )}

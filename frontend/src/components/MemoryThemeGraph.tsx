@@ -22,7 +22,7 @@ export function MemoryThemeGraph({ graph }: { graph: MemoryGraph | null }) {
 
   if (!graph || (persons.length === 0 && topics.length === 0)) {
     return (
-      <div className="bg-white rounded-2xl p-8 text-center text-gray-500 border border-warm-light">
+      <div className="bg-card rounded-card p-8 text-center text-muted border border-hairline">
         记忆还太少，聊得越多，这里的人物和话题网络就越清晰 🕸
       </div>
     );
@@ -48,9 +48,9 @@ export function MemoryThemeGraph({ graph }: { graph: MemoryGraph | null }) {
     edges.find((e) => e.person === person && e.topic === topic);
 
   return (
-    <div className="bg-white rounded-2xl p-5 shadow-sm border border-warm-light">
-      <h3 className="text-lg font-bold text-gray-900">🕸 记忆主题图谱</h3>
-      <p className="text-sm text-gray-500 mt-1 mb-2">
+    <div className="bg-card rounded-card p-5 shadow-card border border-hairline">
+      <h3 className="text-lg font-bold text-ink">🕸 记忆主题图谱</h3>
+      <p className="text-sm text-muted mt-1 mb-2">
         从 {graph.memory_count} 条长期记忆里抽出的人物与话题，连线表示两者被同时提到。
         只看得到词与次数，看不到记忆原文。
       </p>
@@ -123,7 +123,7 @@ export function MemoryThemeGraph({ graph }: { graph: MemoryGraph | null }) {
         })}
       </svg>
 
-      <p className="text-xs text-gray-400 mt-2">
+      <p className="text-xs text-faint mt-2">
         节点越大出现次数越多；连线越粗同时提到的次数越多。悬停节点可看具体次数。
       </p>
     </div>

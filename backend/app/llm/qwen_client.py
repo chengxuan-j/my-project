@@ -45,6 +45,8 @@ class QwenClient(LLMClient):
         # 情境分析等轻量任务用快模型，省一半耗时
         self.analysis_model = settings.qwen_analysis_model
         self.timeout = settings.request_timeout
+        # 推理模型是否下发 enable_thinking：None 表示不传（保持服务端默认）
+        self.enable_thinking = settings.qwen_enable_thinking
         # 持久 HTTP 连接池：复用同一个 AsyncClient，避免每次请求重建 TCP+TLS。
         # 一轮对话有 3 次调用（情境分析 / 向量检索 / 生成回复），累计可省 0.5~1s。
         self._clients: Dict[bool, httpx.AsyncClient] = {}
@@ -60,6 +62,16 @@ class QwenClient(LLMClient):
             c = httpx.AsyncClient(timeout=self.timeout, trust_env=trust_env)
             self._clients[trust_env] = c
         return c
+
+    def _apply_thinking(self, payload: Dict[str, Any], kwargs: Dict[str, Any]) -> None:
+        """按配置决定是否下发 enable_thinking。
+
+        推理模型（qwen3 系列）默认先输出思维链，content 要等思考完才出来，
+        陪伴场景下这 7 秒的差距不能接受。调用方可用 kwargs 单独覆盖。
+        """
+        thinking = kwargs.get("enable_thinking", self.enable_thinking)
+        if thinking is not None:
+            payload["enable_thinking"] = bool(thinking)
 
     @property
     def is_configured(self) -> bool:
@@ -77,6 +89,7 @@ class QwenClient(LLMClient):
         }
         if "max_tokens" in kwargs:
             payload["max_tokens"] = kwargs["max_tokens"]
+        self._apply_thinking(payload, kwargs)
 
         url = f"{self.base_url}/chat/completions"
         headers = {
@@ -91,15 +104,18 @@ class QwenClient(LLMClient):
             # trust_env=True 会把国内请求也绕进代理，实测每次多 0.7~1.2s。
             client = self._client(trust_env=False)
             resp = await client.post(url, json=payload, headers=headers)
-            # 部分模型（如 kimi-k3）不接受 temperature 参数，会返回 400
-            # InvalidParameter；去掉该参数重试一次，避免整条链路被一个
-            # 无关参数打断（调用方无需关心具体模型支持哪些参数）。
-            if resp.status_code == 400 and "temperature" in resp.text:
+            # 部分模型不接受某些可选参数（如 kimi-k3 不认 temperature、
+            # 老模型不认 enable_thinking），逐个摘掉重试一次，避免一个
+            # 无关参数打断整条链路（调用方无需关心具体模型支持哪些参数）。
+            for opt in ("temperature", "enable_thinking"):
+                if resp.status_code != 400 or opt not in payload or opt not in resp.text:
+                    break
                 logger.info(
-                    "模型 %s 不接受 temperature 参数，去掉后重试",
+                    "模型 %s 不接受 %s 参数，去掉后重试",
                     payload.get("model"),
+                    opt,
                 )
-                payload.pop("temperature", None)
+                payload.pop(opt, None)
                 resp = await client.post(url, json=payload, headers=headers)
         except httpx.TimeoutException as e:
             raise LLMError(f"Qwen API 请求超时（{self.timeout}s）") from e
@@ -152,6 +168,7 @@ class QwenClient(LLMClient):
         }
         if "max_tokens" in kwargs:
             payload["max_tokens"] = kwargs["max_tokens"]
+        self._apply_thinking(payload, kwargs)
 
         url = f"{self.base_url}/chat/completions"
         headers = {
