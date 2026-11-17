@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Clapperboard, Mic, Save, Square, Trash2 } from 'lucide-react';
 import { ApiError, memoirApi, MemoirStory, speechApi } from '@/lib/api';
 import { DEMO_SCRIPTS, matchScriptReply } from '@/data/demo-stories';
 
@@ -298,18 +299,18 @@ export function StoryComposer({ onChanged, onUseForFilm }: Props) {
   };
 
   return (
-    <section className="mb-6 rounded-2xl border-2 border-warm-light bg-warm-bg p-4 hc-invert">
+    <section className="mb-6 rounded-card border border-hairline bg-card shadow-card p-5 hc-invert">
       <div className="flex items-baseline justify-between flex-wrap gap-2">
-        <h2 className="text-xl font-bold text-gray-900">🎤 聊聊想做成短片的故事</h2>
+        <h2 className="flex items-center gap-2 text-lg font-bold text-ink"><Mic aria-hidden className="h-5 w-5 text-primary" />聊聊想做成短片的故事</h2>
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-500">您说一句，小忆接一句</span>
+          <span className="text-sm text-muted">您说一句，小忆接一句</span>
           {!demo && userCount === 0 && (
             <button
               type="button"
               onClick={() => setShowScripts((v) => !v)}
-              className="min-h-[40px] px-3 rounded-lg bg-white border border-warm-light text-sm text-gray-600 hover:border-warm-primary"
+              className="min-h-[40px] px-3 rounded-btn bg-card border border-hairline text-sm text-muted hover:border-hairline-strong"
             >
-              {showScripts ? '收起脚本' : '🎬 演示脚本'}
+              <Clapperboard aria-hidden className="h-4 w-4" />{showScripts ? '收起脚本' : '演示脚本'}
             </button>
           )}
         </div>
@@ -317,8 +318,8 @@ export function StoryComposer({ onChanged, onUseForFilm }: Props) {
 
       {/* 演示脚本选择：固定台词 + 固定回答，不走模型 */}
       {showScripts && !demo && (
-        <div className="mt-3 rounded-xl border border-warm-light bg-white p-3">
-          <p className="text-sm text-gray-600">
+        <div className="mt-3 rounded-card border border-hairline bg-card-soft p-3">
+          <p className="text-sm text-muted">
             选一段，自动一句句铺开；也可以照着台词念，小忆会按脚本回答。
           </p>
           <div className="mt-2 flex flex-wrap gap-3">
@@ -327,17 +328,17 @@ export function StoryComposer({ onChanged, onUseForFilm }: Props) {
                 key={s.id}
                 type="button"
                 onClick={() => startDemo(s.id)}
-                className="min-h-[56px] flex-1 min-w-[240px] text-left rounded-xl border-2 border-warm-light bg-warm-bg px-4 py-3 hover:border-warm-primary"
+                className="min-h-[56px] flex-1 min-w-[240px] text-left rounded-btn border border-hairline bg-card px-4 py-3 hover:border-primary"
               >
-                <span className="block text-lg font-bold text-gray-900">
+                <span className="block text-lg font-bold text-ink">
                   {s.title}
                   {s.id === 'night-road' && (
-                    <span className="ml-2 rounded-full bg-warm-primary px-2 py-0.5 text-xs text-white align-middle">
+                    <span className="ml-2 rounded-pill bg-primary px-2 py-0.5 text-xs text-on-primary align-middle">
                       推荐
                     </span>
                   )}
                 </span>
-                <span className="block text-sm text-gray-600">{s.subtitle}</span>
+                <span className="block text-sm text-muted">{s.subtitle}</span>
               </button>
             ))}
           </div>
@@ -346,17 +347,17 @@ export function StoryComposer({ onChanged, onUseForFilm }: Props) {
 
       {/* 演示进行中的控制条 */}
       {demo && demoScript && (
-        <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 flex flex-wrap items-center gap-3">
-          <span className="text-sm text-amber-800 font-bold">
+        <div className="mt-3 rounded-card border border-hairline bg-warning-soft p-3 flex flex-wrap items-center gap-3">
+          <span className="text-sm text-warning font-bold">
             演示中：{demoScript.title}（{Math.min(demo.index, demoScript.turns.length)}/
             {demoScript.turns.length}）
           </span>
           <button
             type="button"
             onClick={() => setDemo((d) => (d ? { ...d, playing: !d.playing } : d))}
-            className="min-h-[44px] px-4 rounded-lg bg-white border border-amber-300 text-amber-800 font-bold"
+            className="min-h-[44px] px-4 rounded-btn bg-card border border-hairline text-warning font-bold"
           >
-            {demo.playing ? '⏸ 暂停' : '▶ 继续'}
+            {demo.playing ? '暂停' : '继续'}
           </button>
           <button
             type="button"
@@ -365,14 +366,14 @@ export function StoryComposer({ onChanged, onUseForFilm }: Props) {
               setTurns([]);
               setDemo({ scriptId: demo.scriptId, index: 0, playing: true });
             }}
-            className="min-h-[44px] px-4 rounded-lg bg-white border border-amber-300 text-amber-800 font-bold"
+            className="min-h-[44px] px-4 rounded-btn bg-card border border-hairline text-warning font-bold"
           >
-            ↺ 重来
+            重来
           </button>
           <button
             type="button"
             onClick={exitDemo}
-            className="min-h-[44px] px-4 rounded-lg bg-white border border-gray-300 text-gray-600 font-bold"
+            className="min-h-[44px] px-4 rounded-btn bg-card border border-hairline text-muted font-bold"
           >
             退出演示
           </button>
@@ -382,18 +383,18 @@ export function StoryComposer({ onChanged, onUseForFilm }: Props) {
       {/* 对话区 */}
       <div
         ref={scrollRef}
-        className="mt-3 max-h-[420px] overflow-y-auto rounded-xl bg-white/60 p-3 space-y-3"
+        className="mt-3 max-h-[420px] overflow-y-auto rounded-card bg-primary-softer p-3 space-y-3"
       >
         <Bubble role="assistant">{GREETING}</Bubble>
         {turns.map((t, i) => (
           <div key={i}>
             {t.scene && (
-              <div className="my-3 flex items-center gap-2 text-sm text-gray-500">
-                <span className="h-px flex-1 bg-warm-light" />
-                <span className="shrink-0 rounded-full bg-warm-light px-3 py-1 text-warm-dark font-bold">
+              <div className="my-3 flex items-center gap-2 text-sm text-muted">
+                <span className="h-px flex-1 bg-hairline" />
+                <span className="shrink-0 rounded-pill bg-primary-soft px-3 py-1 text-primary font-bold">
                   {t.scene}
                 </span>
-                <span className="h-px flex-1 bg-warm-light" />
+                <span className="h-px flex-1 bg-hairline" />
               </div>
             )}
             <Bubble role={t.role}>{t.content}</Bubble>
@@ -401,7 +402,7 @@ export function StoryComposer({ onChanged, onUseForFilm }: Props) {
         ))}
         {thinking && (
           <Bubble role="assistant">
-            <span className="text-gray-500">小忆在想…</span>
+            <span className="text-muted">小忆在想…</span>
           </Bubble>
         )}
       </div>
@@ -421,7 +422,7 @@ export function StoryComposer({ onChanged, onUseForFilm }: Props) {
             }}
             rows={2}
             placeholder="想到哪儿说到哪儿，比如：我十七岁那年去修水库……"
-            className="w-full rounded-xl border-2 border-warm-light bg-white p-3 text-lg leading-relaxed text-gray-900 placeholder:text-gray-400 focus:border-warm-primary focus:outline-none"
+            className="w-full rounded-input border border-hairline bg-card p-3 text-lg leading-relaxed text-ink placeholder:text-faint focus:border-primary focus:outline-none"
           />
 
           <div className="mt-2 flex flex-wrap items-center gap-3">
@@ -429,18 +430,20 @@ export function StoryComposer({ onChanged, onUseForFilm }: Props) {
               <button
                 type="button"
                 onClick={stopRecording}
-                className="min-h-[56px] px-6 rounded-xl bg-red-600 hover:bg-red-700 text-white text-lg font-bold"
+                className="min-h-[56px] px-6 rounded-btn bg-danger text-on-primary text-lg font-bold inline-flex items-center gap-1.5"
               >
-                ⏹ 说完了（{seconds} 秒）
+                <Square aria-hidden className="h-5 w-5" />
+              说完了（{seconds} 秒）
               </button>
             ) : (
               <button
                 type="button"
                 onClick={startRecording}
                 disabled={transcribing || thinking || saving}
-                className="min-h-[56px] px-6 rounded-xl bg-white border-2 border-warm-primary text-warm-dark text-lg font-bold disabled:opacity-50"
+                className="min-h-[56px] px-6 rounded-btn bg-card border border-hairline-strong text-primary text-lg font-bold disabled:opacity-50 inline-flex items-center gap-1.5"
               >
-                🎙 用嘴说
+                <Mic aria-hidden className="h-5 w-5" />
+                用嘴说
               </button>
             )}
 
@@ -448,12 +451,12 @@ export function StoryComposer({ onChanged, onUseForFilm }: Props) {
               type="button"
               onClick={() => void sendText()}
               disabled={!draft.trim() || thinking || recording || transcribing}
-              className="min-h-[56px] px-6 rounded-xl bg-warm-primary hover:bg-warm-dark text-white text-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+              className="min-h-[56px] px-6 rounded-btn bg-primary hover:bg-primary-strong text-on-primary shadow-btn text-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed"
             >
               发送
             </button>
 
-            {transcribing && <span className="text-gray-600 text-lg">正在听您说……</span>}
+            {transcribing && <span className="text-muted text-lg">正在听您说……</span>}
 
             {userCount > 0 && (
               <button
@@ -463,7 +466,7 @@ export function StoryComposer({ onChanged, onUseForFilm }: Props) {
                   setDraft('');
                   usedVoiceRef.current = false;
                 }}
-                className="ml-auto min-h-[48px] px-4 rounded-xl bg-white border border-gray-300 text-gray-600"
+                className="ml-auto min-h-[48px] px-4 rounded-btn bg-card border border-hairline text-muted"
               >
                 重新说一段
               </button>
@@ -473,13 +476,13 @@ export function StoryComposer({ onChanged, onUseForFilm }: Props) {
       )}
 
       {demo && (
-        <p className="mt-3 text-sm text-amber-800">
+        <p className="mt-3 text-sm text-warning">
           演示模式：台词按脚本自动往下走，铺完或点「暂停」后可以直接保存。
         </p>
       )}
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-muted">
           {userCount === 0
             ? '说一句就能开始，小忆会顺着您的话往下问。'
             : `已经说了 ${userCount} 句，可以接着说，也可以随时全部存下来。`}
@@ -488,57 +491,58 @@ export function StoryComposer({ onChanged, onUseForFilm }: Props) {
           type="button"
           onClick={handleSave}
           disabled={saving || userCount === 0}
-          className="min-h-[56px] px-6 rounded-xl bg-warm-primary hover:bg-warm-dark text-white text-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+          className="min-h-[56px] px-6 rounded-btn bg-primary hover:bg-primary-strong text-on-primary shadow-btn text-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {saving ? '正在存……' : '💾 存到我的故事'}
+          <Save aria-hidden className='h-5 w-5' />
+          {saving ? '正在存……' : '存到我的故事'}
         </button>
       </div>
 
       {error && (
-        <p className="mt-3 rounded-xl bg-red-50 border border-red-200 text-red-700 p-3">{error}</p>
+        <p className="mt-3 rounded-btn bg-danger-soft text-danger p-3">{error}</p>
       )}
       {notice && (
-        <p className="mt-3 rounded-xl bg-green-50 border border-green-200 text-green-700 p-3">{notice}</p>
+        <p className="mt-3 rounded-btn bg-success-soft text-success p-3">{notice}</p>
       )}
 
       <div className="mt-5">
         <div className="flex items-baseline justify-between">
-          <h3 className="text-lg font-bold text-gray-800">我存的故事</h3>
-          <span className="text-sm text-gray-500">
+          <h3 className="text-lg font-bold text-ink">我存的故事</h3>
+          <span className="text-sm text-muted">
             {loading ? '正在读……' : `共 ${drafts.length} 段`}
           </span>
         </div>
 
         {!loading && drafts.length === 0 && (
-          <p className="mt-2 text-gray-500">还没有存过。聊完一段，点「存到我的故事」就出现在这里。</p>
+          <p className="mt-2 text-muted">还没有存过。聊完一段，点「存到我的故事」就出现在这里。</p>
         )}
 
         <ul className="mt-2 space-y-3">
           {drafts.map((story) => (
-            <li key={story.id} className="rounded-xl border border-warm-light bg-white p-4">
+            <li key={story.id} className="rounded-card border border-hairline bg-card-soft p-4">
               <div className="flex items-baseline justify-between gap-2 flex-wrap">
-                <p className="text-lg font-bold text-gray-900">{story.title || '一段回忆'}</p>
-                <span className="text-sm text-gray-500">{formatDate(story.created_at)}</span>
+                <p className="text-lg font-bold text-ink">{story.title || '一段回忆'}</p>
+                <span className="text-sm text-muted">{formatDate(story.created_at)}</span>
               </div>
-              <p className="mt-1 text-gray-700 leading-relaxed whitespace-pre-wrap max-h-40 overflow-y-auto">
+              <p className="mt-1 text-ink leading-relaxed whitespace-pre-wrap max-h-40 overflow-y-auto">
                 {story.summary}
               </p>
 
               {confirmId === story.id ? (
-                <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl bg-red-50 border border-red-200 p-3">
-                  <p className="text-red-700">删掉就找不回来了，确定吗？</p>
+                <div className="mt-3 flex flex-wrap items-center gap-3 rounded-btn bg-danger-soft p-3">
+                  <p className="text-danger">删掉就找不回来了，确定吗？</p>
                   <button
                     type="button"
                     onClick={() => handleDelete(story)}
                     disabled={deletingId === story.id}
-                    className="min-h-[48px] px-5 rounded-xl bg-red-600 text-white font-bold disabled:opacity-50"
+                    className="min-h-[48px] px-5 rounded-btn bg-danger text-on-primary font-bold disabled:opacity-50"
                   >
                     {deletingId === story.id ? '正在删……' : '确定删除'}
                   </button>
                   <button
                     type="button"
                     onClick={() => setConfirmId(null)}
-                    className="min-h-[48px] px-5 rounded-xl bg-white border border-gray-300 text-gray-700 font-bold"
+                    className="min-h-[48px] px-5 rounded-btn bg-card border border-hairline text-ink font-bold"
                   >
                     先不删
                   </button>
@@ -550,17 +554,19 @@ export function StoryComposer({ onChanged, onUseForFilm }: Props) {
                       type="button"
                       onClick={() => handleUseForFilm(story)}
                       disabled={filmId === story.id}
-                      className="min-h-[48px] px-5 rounded-xl bg-warm-primary text-white font-bold disabled:opacity-50"
+                      className="min-h-[48px] px-5 rounded-btn bg-primary text-on-primary font-bold disabled:opacity-50 inline-flex items-center gap-1.5"
                     >
-                      {filmId === story.id ? '正在排……' : '🎬 用这段做短片'}
+                      <Clapperboard aria-hidden className='h-5 w-5' />
+                      {filmId === story.id ? '正在排……' : '用这段做短片'}
                     </button>
                   )}
                   <button
                     type="button"
                     onClick={() => setConfirmId(story.id)}
-                    className="min-h-[48px] px-5 rounded-xl bg-white border border-gray-300 text-gray-700 font-bold hover:border-red-400 hover:text-red-600"
+                    className="min-h-[48px] px-5 rounded-btn bg-card border border-hairline text-ink font-bold hover:border-hairline-strong hover:text-danger inline-flex items-center gap-1.5"
                   >
-                    🗑 删除
+                    <Trash2 aria-hidden className="h-5 w-5" />
+                    删除
                   </button>
                 </div>
               )}
@@ -577,15 +583,15 @@ function Bubble({ role, children }: { role: 'user' | 'assistant'; children: Reac
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       {!isUser && (
-        <span className="mr-2 mt-1 shrink-0 w-9 h-9 rounded-full bg-warm-light text-warm-dark flex items-center justify-center text-sm font-bold">
+        <span className="mr-2 mt-1 shrink-0 w-9 h-9 rounded-pill bg-primary-soft text-primary flex items-center justify-center text-sm font-bold">
           小忆
         </span>
       )}
       <p
-        className={`max-w-[82%] rounded-2xl px-4 py-3 text-lg leading-relaxed whitespace-pre-wrap ${
+        className={`max-w-[82%] rounded-card px-4 py-3 text-lg leading-relaxed whitespace-pre-wrap ${
           isUser
-            ? 'bg-warm-primary text-white rounded-br-md'
-            : 'bg-white border border-warm-light text-gray-900 rounded-bl-md'
+            ? 'bg-primary text-on-primary rounded-br-sm'
+            : 'bg-card border border-hairline text-ink rounded-bl-sm'
         }`}
       >
         {children}

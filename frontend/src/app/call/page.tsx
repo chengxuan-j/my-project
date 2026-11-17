@@ -354,6 +354,17 @@ export default function CallPage() {
     if (endedRef.current || mrRef.current) return;
     if (!auto) stopPlayback();
     stopVad();
+    // 安全上下文守卫：手机用局域网 IP（http://）打开时浏览器直接禁掉麦克风。
+    // 不拦的话 getUserMedia 是 undefined，抛 TypeError 被 catch 成「没权限」，
+    // 会误导用户去翻系统权限设置。
+    if (
+      typeof window !== 'undefined' &&
+      (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia)
+    ) {
+      setStage('idle');
+      setHint('当前是 HTTP 地址，浏览器禁用了麦克风。请用 http://localhost:3000 打开（不要用 IP 地址）。');
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       if (endedRef.current) {
