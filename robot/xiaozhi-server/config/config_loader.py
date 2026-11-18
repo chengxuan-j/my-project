@@ -1,5 +1,6 @@
 import os
 import asyncio
+import re
 import yaml
 from collections.abc import Mapping
 from config.manage_api_client import (
@@ -17,10 +18,38 @@ def get_project_dir():
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/"
 
 
+# 匹配 ${VAR_NAME} 形式的环境变量占位符
+_ENV_VAR_PATTERN = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
+
+
+def _expand_env(value):
+    """递归展开配置里的 ${ENV_VAR} 占位符。
+
+    - 字符串：把 ${VAR} 替换为同名环境变量的值；变量未设置则保留原样并告警，
+      避免静默变成空 key 导致难以排查的鉴权失败。
+    - dict / list：逐项递归处理。
+    - 其他类型：原样返回。
+    """
+    if isinstance(value, str):
+        def repl(match):
+            name = match.group(1)
+            env_value = os.environ.get(name)
+            if env_value is None:
+                print(f"警告：配置引用了环境变量 {name}，但系统未设置该变量，已保留占位符原样")
+                return match.group(0)
+            return env_value
+        return _ENV_VAR_PATTERN.sub(repl, value)
+    if isinstance(value, Mapping):
+        return {k: _expand_env(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_expand_env(item) for item in value]
+    return value
+
+
 def read_config(config_path):
     with open(config_path, "r", encoding="utf-8") as file:
         config = yaml.safe_load(file)
-    return config
+    return _expand_env(config)
 
 
 async def load_config():

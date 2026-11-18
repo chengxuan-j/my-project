@@ -753,7 +753,8 @@ VLLM:
     model_name: qwen-vl-max
     url: https://dashscope.aliyuncs.com/compatible-mode/v1
     # 可在这里找到你的api key https://bailian.console.aliyun.com/?apiKey=1#/api-key
-    api_key: sk-5959e6934a9841dda852d9514cbe1ca4
+    # API Key 从环境变量 DASHSCOPE_API_KEY 读取，勿在仓库中写明文
+    api_key: ${DASHSCOPE_API_KEY}
   XunfeiSparkLLM:
     # 定义LLM API类型
     type: openai
